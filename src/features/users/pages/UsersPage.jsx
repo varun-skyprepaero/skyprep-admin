@@ -1,0 +1,1034 @@
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Navigate } from 'react-router-dom'
+import { Button } from '@/components/ui/button'
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card'
+import {
+  DataTable,
+  DataTableContent,
+  DataTablePagination,
+  DataTableToolbar,
+  dataTableSelectClass,
+} from '@/components/ui/data-table'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { USER_ENDPOINTS } from '@/features/auth/constants'
+import {
+  cancelInvitation,
+  createInvitation,
+  fetchPendingInvitations,
+  resendInvitation,
+} from '@/features/invitations/api/invitations-api'
+import { INVITABLE_ROLE_OPTIONS, SUPER_ADMIN_ROLE_NAME } from '@/features/invitations/constants'
+import { adminUpdateUser, fetchUsers } from '@/features/users/api/users-api'
+import { handleApiError } from '@/lib/http/api-error'
+import { notifyError, notifySuccess } from '@/lib/notifications'
+import { useAuthStore } from '@/stores/auth-store'
+import { cn } from '@/lib/utils'
+import { Loader2, MoreHorizontal, UserPlus, X } from 'lucide-react'
+
+const usersQueryKey = ['admin', 'users', USER_ENDPOINTS.list]
+const invitationsQueryKey = ['admin', 'invitations', 'pending']
+
+function formatShortDate(value) {
+  if (!value) return '—'
+  try {
+    return new Date(value).toLocaleString(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    })
+  } catch {
+    return '—'
+  }
+}
+
+/**
+ * @param {import('@/features/users/api/users-api.types').AdminUserRow[]} users
+ * @param {Awaited<ReturnType<typeof fetchPendingInvitations>>} invitations
+ */
+function buildTableRows(users, invitations) {
+  const userByEmail = new Map(users.map((u) => [u.email?.toLowerCase?.() ?? '', u]))
+  const inviteRows = invitations
+    .filter((inv) => inv?.email && !userByEmail.has(inv.email.toLowerCase()))
+    .map((inv) => ({
+      key: `invite:${inv.uuid}`,
+      kind: /** @type {const} */ ('invite'),
+      uuid: inv.uuid,
+      email: inv.email,
+      roleName: inv.roleName,
+      inviteStatus: inv.status,
+      inviteExpired: inv.expired,
+      inviteExpiresAt: inv.expiresAt,
+      inviteSentAt: inv.createdAt,
+      sortAt: inv.createdAt || inv.expiresAt || 0,
+    }))
+
+  const userRows = users.map((u) => ({
+    key: `user:${u.uuid}`,
+    kind: /** @type {const} */ ('user'),
+    uuid: u.uuid,
+    email: u.email,
+    firstName: u.firstName,
+    lastName: u.lastName,
+    roleName: u.role?.name ?? null,
+    registrationSource: u.registrationSource ?? null,
+    isActive: u.isActive,
+    createdAt: u.createdAt,
+    sortAt: u.createdAt || 0,
+  }))
+
+  return [...userRows, ...inviteRows].sort(
+    (a, b) => new Date(b.sortAt).getTime() - new Date(a.sortAt).getTime(),
+  )
+}
+
+function signupSourceSearchBlob(row) {
+  if (row.kind === 'invite') return 'pending invite invitation'
+  switch (row.registrationSource) {
+    case 'INVITED':
+      return 'admin invite invited invitation'
+    case 'SELF_REGISTERED':
+      return 'classroom web self signup registered public'
+    case 'ADMIN_CREATED':
+      return 'admin created provisioned'
+    default:
+      return 'unknown legacy'
+  }
+}
+
+function rowMatchesQuery(row, searchRaw) {
+  const q = searchRaw.trim().toLowerCase()
+  if (!q) return true
+  const email = (row.email ?? '').toLowerCase()
+  const role = (row.roleName ?? '').toLowerCase()
+  const name =
+    row.kind === 'user'
+      ? [row.firstName, row.lastName].filter(Boolean).join(' ').toLowerCase()
+      : 'pending signup invitation'.toLowerCase()
+  const sourceBlob = signupSourceSearchBlob(row).toLowerCase()
+  return (
+    email.includes(q) || role.includes(q) || name.includes(q) || sourceBlob.includes(q)
+  )
+}
+
+/**
+ * @param {ReturnType<typeof buildTableRows>[number]} row
+ * @param {{ typeFilter: string, roleFilter: string, statusFilter: string, signupSourceFilter: string }} f
+ */
+function rowMatchesFilters(row, f) {
+  if (f.typeFilter === 'member' && row.kind !== 'user') return false
+  if (f.typeFilter === 'invite' && row.kind !== 'invite') return false
+  if (f.roleFilter !== 'all' && (row.roleName ?? '') !== f.roleFilter) return false
+
+  if (f.signupSourceFilter !== 'all') {
+    if (f.signupSourceFilter === 'pending_invite' && row.kind !== 'invite') return false
+    if (f.signupSourceFilter !== 'pending_invite' && row.kind === 'invite') return false
+    if (row.kind === 'user') {
+      if (f.signupSourceFilter === 'invited' && row.registrationSource !== 'INVITED') {
+        return false
+      }
+      if (
+        f.signupSourceFilter === 'classroom' &&
+        row.registrationSource !== 'SELF_REGISTERED'
+      ) {
+        return false
+      }
+      if (
+        f.signupSourceFilter === 'admin_created' &&
+        row.registrationSource !== 'ADMIN_CREATED'
+      ) {
+        return false
+      }
+      if (f.signupSourceFilter === 'unknown' && row.registrationSource != null) {
+        return false
+      }
+    }
+  }
+
+  if (f.statusFilter !== 'all') {
+    if (f.statusFilter === 'active' && !(row.kind === 'user' && row.isActive)) return false
+    if (f.statusFilter === 'inactive' && !(row.kind === 'user' && !row.isActive)) return false
+    if (
+      f.statusFilter === 'invite_valid' &&
+      !(row.kind === 'invite' && !row.inviteExpired)
+    ) {
+      return false
+    }
+    if (
+      f.statusFilter === 'invite_expired' &&
+      !(row.kind === 'invite' && row.inviteExpired)
+    ) {
+      return false
+    }
+  }
+  return true
+}
+
+const ROLE_FILTER_OPTIONS = [
+  { value: 'all', label: 'All roles' },
+  { value: SUPER_ADMIN_ROLE_NAME, label: 'Super Admin' },
+  ...INVITABLE_ROLE_OPTIONS.map((o) => ({ value: o.value, label: o.label })),
+]
+
+const TYPE_FILTER_OPTIONS = [
+  { value: 'all', label: 'All types' },
+  { value: 'member', label: 'Members' },
+  { value: 'invite', label: 'Invitations' },
+]
+
+const STATUS_FILTER_OPTIONS = [
+  { value: 'all', label: 'Any status' },
+  { value: 'active', label: 'Active account' },
+  { value: 'inactive', label: 'Inactive account' },
+  { value: 'invite_valid', label: 'Invite · valid' },
+  { value: 'invite_expired', label: 'Invite · expired' },
+]
+
+const SIGNUP_SOURCE_FILTER_OPTIONS = [
+  { value: 'all', label: 'Any signup' },
+  { value: 'pending_invite', label: 'Pending invite' },
+  { value: 'invited', label: 'Joined via admin invite' },
+  { value: 'classroom', label: 'Classroom (web signup)' },
+  { value: 'admin_created', label: 'Admin-created account' },
+  { value: 'unknown', label: 'Unknown / legacy' },
+]
+
+function SignupSourceCell({ row }) {
+  if (row.kind === 'invite') {
+    return (
+      <span className="text-xs text-muted-foreground">Pending invite</span>
+    )
+  }
+  switch (row.registrationSource) {
+    case 'INVITED':
+      return (
+        <span className="inline-flex rounded-full bg-violet-500/15 px-2 py-0.5 text-xs font-medium text-violet-800 dark:text-violet-300">
+          Admin invite
+        </span>
+      )
+    case 'SELF_REGISTERED':
+      return (
+        <span className="inline-flex rounded-full bg-teal-500/15 px-2 py-0.5 text-xs font-medium text-teal-800 dark:text-teal-300">
+          Classroom (web)
+        </span>
+      )
+    case 'ADMIN_CREATED':
+      return (
+        <span className="inline-flex rounded-full bg-slate-500/15 px-2 py-0.5 text-xs font-medium text-slate-800 dark:text-slate-300">
+          Admin created
+        </span>
+      )
+    default:
+      return <span className="text-xs text-muted-foreground">Unknown</span>
+  }
+}
+
+export default function UsersPage() {
+  const queryClient = useQueryClient()
+  const user = useAuthStore((s) => s.user)
+  const hasHydrated = useAuthStore((s) => s._hasHydrated)
+  const isBootstrapping = useAuthStore((s) => s.isBootstrapping)
+
+  const [inviteOpen, setInviteOpen] = useState(false)
+  const [email, setEmail] = useState('')
+  const [roleName, setRoleName] = useState(INVITABLE_ROLE_OPTIONS[0].value)
+  const [inviteErrors, setInviteErrors] = useState({})
+
+  const [menuOpenFor, setMenuOpenFor] = useState(/** @type {string | null} */ (null))
+  const menuPanelRef = useRef(/** @type {HTMLDivElement | null} */ (null))
+
+  const [editUser, setEditUser] = useState(
+    /** @type {null | { uuid: string, firstName: string, lastName: string, isActive: boolean, roleName: string | null }} */ (
+      null
+    ),
+  )
+  const [editErrors, setEditErrors] = useState({})
+  const [cancelInviteTarget, setCancelInviteTarget] = useState(
+    /** @type {null | { uuid: string, email: string }} */ (null),
+  )
+
+  const [tableSearch, setTableSearch] = useState('')
+  const [typeFilter, setTypeFilter] = useState('all')
+  const [roleFilter, setRoleFilter] = useState('all')
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [signupSourceFilter, setSignupSourceFilter] = useState('all')
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
+
+  useEffect(() => {
+    if (!menuOpenFor) return
+    function onPointerDown(e) {
+      const el = menuPanelRef.current
+      if (el?.contains(e.target)) return
+      const toggler = document.querySelector(`[data-row-menu-trigger="${menuOpenFor}"]`)
+      if (toggler?.contains(e.target)) return
+      setMenuOpenFor(null)
+    }
+    document.addEventListener('mousedown', onPointerDown)
+    return () => document.removeEventListener('mousedown', onPointerDown)
+  }, [menuOpenFor])
+
+  const usersQuery = useQuery({
+    queryKey: usersQueryKey,
+    queryFn: fetchUsers,
+    enabled: Boolean(user?.role?.name === SUPER_ADMIN_ROLE_NAME),
+  })
+
+  const invitationsQuery = useQuery({
+    queryKey: invitationsQueryKey,
+    queryFn: fetchPendingInvitations,
+    enabled: Boolean(user?.role?.name === SUPER_ADMIN_ROLE_NAME),
+  })
+
+  const rows = useMemo(
+    () => buildTableRows(usersQuery.data ?? [], invitationsQuery.data ?? []),
+    [usersQuery.data, invitationsQuery.data],
+  )
+
+  const filterState = useMemo(
+    () => ({ typeFilter, roleFilter, statusFilter, signupSourceFilter }),
+    [typeFilter, roleFilter, statusFilter, signupSourceFilter],
+  )
+
+  const filteredRows = useMemo(() => {
+    return rows.filter(
+      (r) => rowMatchesFilters(r, filterState) && rowMatchesQuery(r, tableSearch),
+    )
+  }, [rows, filterState, tableSearch])
+
+  const totalFiltered = filteredRows.length
+  const totalPages = Math.max(1, Math.ceil(totalFiltered / pageSize) || 1)
+  const effectivePage = Math.min(Math.max(1, page), totalPages)
+
+  const paginatedRows = useMemo(() => {
+    const start = (effectivePage - 1) * pageSize
+    return filteredRows.slice(start, start + pageSize)
+  }, [filteredRows, effectivePage, pageSize])
+
+  function invalidatePeople() {
+    queryClient.invalidateQueries({ queryKey: usersQueryKey })
+    queryClient.invalidateQueries({ queryKey: invitationsQueryKey })
+  }
+
+  const inviteMutation = useMutation({
+    mutationFn: () =>
+      createInvitation({
+        email: email.trim(),
+        roleName,
+      }),
+    onSuccess: (response) => {
+      setInviteErrors({})
+      const data = response?.data
+      notifySuccess(
+        response?.message ||
+          `Invitation sent to ${data?.email}. They will receive a signup link by email.`,
+      )
+      if (data?.signupUrl && import.meta.env.DEV) {
+        console.info('[invite] signup URL', data.signupUrl)
+      }
+      setEmail('')
+      setRoleName(INVITABLE_ROLE_OPTIONS[0].value)
+      setInviteOpen(false)
+      invalidatePeople()
+    },
+    onError: (error) => {
+      const { message, fieldErrors } = handleApiError(error, 'Unable to send invitation')
+      setInviteErrors({ ...fieldErrors, ...(message ? { root: message } : {}) })
+    },
+  })
+
+  const resendMutation = useMutation({
+    mutationFn: (/** @type {string} */ invitationUuid) => resendInvitation(invitationUuid),
+    onSuccess: (response) => {
+      notifySuccess(response?.message ?? 'Invitation resent')
+      setMenuOpenFor(null)
+      invalidatePeople()
+      const url = response?.data?.signupUrl
+      if (url && import.meta.env.DEV) console.info('[invite] resent URL', url)
+    },
+    onError: (error) => {
+      const { message } = handleApiError(error, 'Unable to resend invitation')
+      notifyError(message || 'Unable to resend invitation')
+    },
+  })
+
+  const cancelInviteMutation = useMutation({
+    mutationFn: (/** @type {string} */ invitationUuid) => cancelInvitation(invitationUuid),
+    onSuccess: (response) => {
+      notifySuccess(response?.message ?? 'Invitation cancelled')
+      setMenuOpenFor(null)
+      setCancelInviteTarget(null)
+      invalidatePeople()
+    },
+    onError: (error) => {
+      const { message } = handleApiError(error, 'Unable to cancel invitation')
+      notifyError(message || 'Unable to cancel invitation')
+    },
+  })
+
+  const adminUpdateMutation = useMutation({
+    mutationFn: (/** @type {{ uuid: string, payload: { firstName?: string, lastName?: string | null, isActive?: boolean } }} */ vars) =>
+      adminUpdateUser(vars.uuid, vars.payload),
+    onSuccess: (response) => {
+      notifySuccess(response?.message ?? 'User updated')
+      setEditUser(null)
+      setEditErrors({})
+      invalidatePeople()
+    },
+    onError: (error) => {
+      const { message, fieldErrors } = handleApiError(error, 'Unable to update user')
+      setEditErrors({ ...fieldErrors, ...(message ? { root: message } : {}) })
+      notifyError(message || 'Unable to update user')
+    },
+  })
+
+  function handleInviteSubmit(e) {
+    e.preventDefault()
+    setInviteErrors({})
+    if (!email.trim()) {
+      setInviteErrors({ email: 'Email is required' })
+      return
+    }
+    inviteMutation.mutate()
+  }
+
+  function closeInvite() {
+    if (inviteMutation.isPending) return
+    setInviteOpen(false)
+    setInviteErrors({})
+  }
+
+  function openCancelInviteConfirm(row) {
+    if (row.kind !== 'invite') return
+    setMenuOpenFor(null)
+    setCancelInviteTarget({ uuid: row.uuid, email: row.email ?? '' })
+  }
+
+  function closeCancelInviteConfirm() {
+    if (cancelInviteMutation.isPending) return
+    setCancelInviteTarget(null)
+  }
+
+  function openEditForUser(row) {
+    if (row.kind !== 'user') return
+    setEditErrors({})
+    setEditUser({
+      uuid: row.uuid,
+      firstName: row.firstName ?? '',
+      lastName: row.lastName ?? '',
+      isActive: Boolean(row.isActive),
+      roleName: row.roleName,
+    })
+    setMenuOpenFor(null)
+  }
+
+  function submitEdit(e) {
+    e.preventDefault()
+    if (!editUser) return
+    setEditErrors({})
+    const payload = {
+      firstName: editUser.firstName.trim(),
+      lastName: editUser.lastName.trim() || null,
+    }
+    if (!payload.firstName) {
+      setEditErrors({ firstName: 'First name is required' })
+      return
+    }
+    if (editUser.roleName !== SUPER_ADMIN_ROLE_NAME) {
+      payload.isActive = editUser.isActive
+    }
+    adminUpdateMutation.mutate({ uuid: editUser.uuid, payload })
+  }
+
+  const loadingPeople = usersQuery.isLoading || invitationsQuery.isLoading
+  const peopleError = usersQuery.isError
+    ? usersQuery.error
+    : invitationsQuery.isError
+      ? invitationsQuery.error
+      : null
+
+  if (!hasHydrated || isBootstrapping) {
+    return (
+      <div className="flex min-h-[40vh] items-center justify-center">
+        <Loader2 className="size-8 animate-spin text-primary" aria-hidden />
+      </div>
+    )
+  }
+
+  if (user?.role?.name !== SUPER_ADMIN_ROLE_NAME) {
+    return <Navigate to="/" replace />
+  }
+
+  return (
+    <div className="space-y-8">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Users</h1>
+          <p className="mt-2 max-w-2xl text-muted-foreground">
+            Manage members and pending invitations. Invite people by email; they complete signup via
+            their link.
+          </p>
+        </div>
+        <Button type="button" onClick={() => setInviteOpen(true)} className="shrink-0 gap-2">
+          <UserPlus className="size-4" aria-hidden />
+          Invite user
+        </Button>
+      </div>
+
+      <section className="space-y-3">
+        <div>
+          <h2 className="text-lg font-semibold tracking-tight">People</h2>
+          <p className="text-sm text-muted-foreground">
+            Registered accounts and outstanding invitations (same email only appears once).
+          </p>
+        </div>
+
+        {loadingPeople ? (
+          <div className="flex justify-center rounded-lg border border-border/80 py-16">
+            <Loader2 className="size-8 animate-spin text-muted-foreground" aria-hidden />
+          </div>
+        ) : peopleError ? (
+          <p className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive" role="alert">
+            {peopleError?.message ?? 'Unable to load users.'}
+          </p>
+        ) : (
+          <DataTable>
+            <DataTableToolbar
+              searchValue={tableSearch}
+              onSearchChange={(value) => {
+                setTableSearch(value)
+                setPage(1)
+              }}
+              searchPlaceholder="Search name, email, role, or signup (e.g. classroom, invite)…"
+            >
+              <label className="flex items-center gap-2 text-sm">
+                <span className="whitespace-nowrap text-muted-foreground">Type</span>
+                <select
+                  className={dataTableSelectClass}
+                  value={typeFilter}
+                  onChange={(e) => {
+                    setTypeFilter(e.target.value)
+                    setPage(1)
+                  }}
+                  aria-label="Filter by type"
+                >
+                  {TYPE_FILTER_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <span className="whitespace-nowrap text-muted-foreground">Role</span>
+                <select
+                  className={cn(dataTableSelectClass, 'min-w-[8.5rem]')}
+                  value={roleFilter}
+                  onChange={(e) => {
+                    setRoleFilter(e.target.value)
+                    setPage(1)
+                  }}
+                  aria-label="Filter by role"
+                >
+                  {ROLE_FILTER_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <span className="whitespace-nowrap text-muted-foreground">Status</span>
+                <select
+                  className={cn(dataTableSelectClass, 'min-w-[10.5rem]')}
+                  value={statusFilter}
+                  onChange={(e) => {
+                    setStatusFilter(e.target.value)
+                    setPage(1)
+                  }}
+                  aria-label="Filter by status"
+                >
+                  {STATUS_FILTER_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <span className="whitespace-nowrap text-muted-foreground">Signup</span>
+                <select
+                  className={cn(dataTableSelectClass, 'min-w-[11rem] max-w-[14rem]')}
+                  value={signupSourceFilter}
+                  onChange={(e) => {
+                    setSignupSourceFilter(e.target.value)
+                    setPage(1)
+                  }}
+                  aria-label="Filter by signup source"
+                >
+                  {SIGNUP_SOURCE_FILTER_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </DataTableToolbar>
+            <DataTableContent>
+              <table className="w-full min-w-[1024px] caption-bottom text-left text-sm">
+                <thead className="border-b border-border/80 bg-muted/40 [&_tr]:border-0">
+                  <tr className="text-muted-foreground">
+                    <th className="h-11 px-4 align-middle font-medium lg:px-6">Name</th>
+                    <th className="h-11 px-4 align-middle font-medium lg:px-6">Email</th>
+                    <th className="h-11 px-4 align-middle font-medium lg:px-6">Role</th>
+                    <th className="h-11 px-4 align-middle font-medium lg:px-6">Signup</th>
+                    <th className="h-11 px-4 align-middle font-medium lg:px-6">Account</th>
+                    <th className="h-11 px-4 align-middle font-medium lg:px-6">Invitation</th>
+                    <th className="h-11 w-12 px-2 align-middle lg:px-3" aria-label="Actions" />
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/60 [&_tr:last-child]:border-0">
+                  {filteredRows.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="px-6 py-12 text-center text-muted-foreground">
+                        {rows.length === 0
+                          ? 'No users or pending invitations yet.'
+                          : 'No results match your search or filters.'}
+                      </td>
+                    </tr>
+                  ) : (
+                    paginatedRows.map((row) => {
+                      const displayName =
+                        row.kind === 'user'
+                          ? [row.firstName, row.lastName].filter(Boolean).join(' ')
+                          : '—'
+                      const resending =
+                        resendMutation.isPending && resendMutation.variables === row.uuid
+                      return (
+                        <tr key={row.key} className="bg-background transition-colors hover:bg-muted/30">
+                          <td className="px-4 py-3 align-middle font-medium text-foreground lg:px-6">
+                            <div className="flex flex-col gap-0.5">
+                              <span>{displayName || '—'}</span>
+                              {row.kind === 'invite' ? (
+                                <span className="text-xs font-normal text-muted-foreground">
+                                  Pending signup
+                                </span>
+                              ) : null}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 align-middle text-muted-foreground lg:px-6">
+                            {row.email}
+                          </td>
+                          <td className="px-4 py-3 align-middle lg:px-6">{row.roleName ?? '—'}</td>
+                          <td className="px-4 py-3 align-middle lg:px-6">
+                            <SignupSourceCell row={row} />
+                          </td>
+                          <td className="px-4 py-3 align-middle lg:px-6">
+                            {row.kind === 'user' ? (
+                              <span
+                                className={cn(
+                                  'inline-flex rounded-full px-2 py-0.5 text-xs font-medium',
+                                  row.isActive
+                                    ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400'
+                                    : 'bg-muted text-muted-foreground',
+                                )}
+                              >
+                                {row.isActive ? 'Active' : 'Inactive'}
+                              </span>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">—</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 align-middle text-muted-foreground lg:px-6">
+                            {row.kind === 'user' ? (
+                              <span className="text-xs">Registered</span>
+                            ) : (
+                              <div className="flex flex-col gap-0.5">
+                                <span
+                                  className={cn(
+                                    'inline-flex w-fit rounded-full px-2 py-0.5 text-xs font-medium',
+                                    row.inviteExpired
+                                      ? 'bg-amber-500/15 text-amber-800 dark:text-amber-400'
+                                      : 'bg-sky-500/15 text-sky-800 dark:text-sky-400',
+                                  )}
+                                >
+                                  {row.inviteExpired ? 'Invite expired' : 'Invite sent'}
+                                </span>
+                                <span className="text-[11px] text-muted-foreground">
+                                  {row.inviteExpired ? 'Expired on' : 'Valid until'}{' '}
+                                  {formatShortDate(row.inviteExpiresAt)}
+                                </span>
+                                <span className="text-[11px] text-muted-foreground">
+                                  Sent {formatShortDate(row.inviteSentAt)}
+                                </span>
+                              </div>
+                            )}
+                          </td>
+                          <td className="relative px-2 py-3 align-middle lg:px-3">
+                            <div className="flex justify-end">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="size-8"
+                                data-row-menu-trigger={row.key}
+                                aria-label="Open row actions"
+                                aria-expanded={menuOpenFor === row.key}
+                                onClick={() =>
+                                  setMenuOpenFor((prev) => (prev === row.key ? null : row.key))
+                                }
+                                disabled={
+                                  resending ||
+                                  cancelInviteMutation.isPending ||
+                                  adminUpdateMutation.isPending
+                                }
+                              >
+                                {resending ? (
+                                  <Loader2 className="size-4 animate-spin" aria-hidden />
+                                ) : (
+                                  <MoreHorizontal className="size-4" aria-hidden />
+                                )}
+                              </Button>
+                            </div>
+                            {menuOpenFor === row.key ? (
+                              <div
+                                ref={menuPanelRef}
+                                className="absolute right-4 top-full z-50 mt-1 min-w-[12rem] rounded-md border border-border bg-popover py-1 text-popover-foreground shadow-md"
+                                role="menu"
+                              >
+                                {row.kind === 'invite' ? (
+                                  <>
+                                    <button
+                                      type="button"
+                                      role="menuitem"
+                                      className="flex w-full px-3 py-2 text-left text-sm hover:bg-accent"
+                                      onClick={() => resendMutation.mutate(row.uuid)}
+                                      disabled={resendMutation.isPending}
+                                    >
+                                      Resend invitation
+                                    </button>
+                                    <button
+                                      type="button"
+                                      role="menuitem"
+                                      className="flex w-full px-3 py-2 text-left text-sm text-destructive hover:bg-destructive/10"
+                                      onClick={() => openCancelInviteConfirm(row)}
+                                      disabled={cancelInviteMutation.isPending}
+                                    >
+                                      Cancel invitation
+                                    </button>
+                                  </>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    role="menuitem"
+                                    className="flex w-full px-3 py-2 text-left text-sm hover:bg-accent"
+                                    onClick={() => openEditForUser(row)}
+                                  >
+                                    Edit user
+                                  </button>
+                                )}
+                              </div>
+                            ) : null}
+                          </td>
+                        </tr>
+                      )
+                    })
+                  )}
+                </tbody>
+              </table>
+            </DataTableContent>
+            <DataTablePagination
+              page={effectivePage}
+              pageSize={pageSize}
+              total={totalFiltered}
+              onPageChange={setPage}
+              onPageSizeChange={(size) => {
+                setPageSize(size)
+                setPage(1)
+              }}
+            />
+          </DataTable>
+        )}
+      </section>
+
+      {inviteOpen ? (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-background/80 p-4 backdrop-blur-sm sm:items-center"
+          role="presentation"
+          onClick={closeInvite}
+        >
+          <Card
+            className="relative z-10 max-h-[90vh] w-full max-w-lg overflow-y-auto shadow-lg"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="invite-user-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <CardHeader>
+              <div className="flex items-start justify-between gap-4">
+                <div className="space-y-1">
+                  <div className="mb-2 flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                    <UserPlus className="size-5" aria-hidden />
+                  </div>
+                  <CardTitle id="invite-user-title">Invite user</CardTitle>
+                  <CardDescription>
+                    Send an email with a secure link. The recipient&apos;s address is fixed and
+                    pre-filled on the registration screen.
+                  </CardDescription>
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="shrink-0"
+                  onClick={closeInvite}
+                  aria-label="Close"
+                  disabled={inviteMutation.isPending}
+                >
+                  <X className="size-4" aria-hidden />
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleInviteSubmit} className="space-y-4" noValidate>
+                {inviteErrors.root ? (
+                  <p
+                    className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+                    role="alert"
+                  >
+                    {inviteErrors.root}
+                  </p>
+                ) : null}
+
+                <div className="space-y-2">
+                  <Label htmlFor="invite-email">Email</Label>
+                  <Input
+                    id="invite-email"
+                    type="email"
+                    autoComplete="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    aria-invalid={Boolean(inviteErrors.email)}
+                    disabled={inviteMutation.isPending}
+                  />
+                  {inviteErrors.email ? (
+                    <p className="text-sm text-destructive">{inviteErrors.email}</p>
+                  ) : null}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="invite-role">Role</Label>
+                  <select
+                    id="invite-role"
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm"
+                    value={roleName}
+                    onChange={(e) => setRoleName(e.target.value)}
+                    disabled={inviteMutation.isPending}
+                  >
+                    {INVITABLE_ROLE_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-muted-foreground">
+                    Students are directed to the Classroom app; staff roles use the Admin app.
+                  </p>
+                </div>
+
+                <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={closeInvite}
+                    disabled={inviteMutation.isPending}
+                  >
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={inviteMutation.isPending}>
+                    {inviteMutation.isPending ? (
+                      <Loader2 className="size-4 animate-spin" aria-hidden />
+                    ) : null}
+                    Send invitation
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+        </div>
+      ) : null}
+
+      {editUser ? (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-background/80 p-4 backdrop-blur-sm sm:items-center"
+          role="presentation"
+          onClick={() => !adminUpdateMutation.isPending && setEditUser(null)}
+        >
+          <Card
+            className="relative z-10 w-full max-w-lg shadow-lg"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="edit-user-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <CardHeader>
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <CardTitle id="edit-user-title">Edit user</CardTitle>
+                  <CardDescription>Update name and account status for this member.</CardDescription>
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => !adminUpdateMutation.isPending && setEditUser(null)}
+                  aria-label="Close"
+                >
+                  <X className="size-4" aria-hidden />
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={submitEdit} className="space-y-4" noValidate>
+                {editErrors.root ? (
+                  <p
+                    className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+                    role="alert"
+                  >
+                    {editErrors.root}
+                  </p>
+                ) : null}
+                <div className="space-y-2">
+                  <Label htmlFor="edit-first">First name</Label>
+                  <Input
+                    id="edit-first"
+                    value={editUser.firstName}
+                    onChange={(e) => setEditUser((s) => (s ? { ...s, firstName: e.target.value } : s))}
+                    aria-invalid={Boolean(editErrors.firstName)}
+                    disabled={adminUpdateMutation.isPending}
+                  />
+                  {editErrors.firstName ? (
+                    <p className="text-sm text-destructive">{editErrors.firstName}</p>
+                  ) : null}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-last">Last name</Label>
+                  <Input
+                    id="edit-last"
+                    value={editUser.lastName}
+                    onChange={(e) => setEditUser((s) => (s ? { ...s, lastName: e.target.value } : s))}
+                    disabled={adminUpdateMutation.isPending}
+                  />
+                </div>
+                {editUser.roleName === SUPER_ADMIN_ROLE_NAME ? (
+                  <p className="text-xs text-muted-foreground">
+                    Super Admin accounts cannot be deactivated from this screen.
+                  </p>
+                ) : (
+                  <label className="flex cursor-pointer items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      className="size-4 rounded border-input"
+                      checked={editUser.isActive}
+                      onChange={(e) =>
+                        setEditUser((s) => (s ? { ...s, isActive: e.target.checked } : s))
+                      }
+                      disabled={adminUpdateMutation.isPending}
+                    />
+                    Account active
+                  </label>
+                )}
+                <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setEditUser(null)}
+                    disabled={adminUpdateMutation.isPending}
+                  >
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={adminUpdateMutation.isPending}>
+                    {adminUpdateMutation.isPending ? (
+                      <Loader2 className="size-4 animate-spin" aria-hidden />
+                    ) : null}
+                    Save
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+        </div>
+      ) : null}
+
+      {cancelInviteTarget ? (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-background/80 p-4 backdrop-blur-sm sm:items-center"
+          role="presentation"
+          onClick={closeCancelInviteConfirm}
+        >
+          <Card
+            className="relative z-10 w-full max-w-md shadow-lg"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="cancel-invite-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <CardHeader>
+              <div className="flex items-start justify-between gap-4">
+                <div className="space-y-1">
+                  <CardTitle id="cancel-invite-title">Cancel invitation?</CardTitle>
+                  <CardDescription>
+                    The signup link for{' '}
+                    <span className="font-medium text-foreground">{cancelInviteTarget.email}</span>{' '}
+                    will stop working.
+                  </CardDescription>
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="shrink-0"
+                  onClick={closeCancelInviteConfirm}
+                  aria-label="Close"
+                  disabled={cancelInviteMutation.isPending}
+                >
+                  <X className="size-4" aria-hidden />
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={closeCancelInviteConfirm}
+                  disabled={cancelInviteMutation.isPending}
+                >
+                  Keep invitation
+                </Button>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  onClick={() => cancelInviteMutation.mutate(cancelInviteTarget.uuid)}
+                  disabled={cancelInviteMutation.isPending}
+                >
+                  {cancelInviteMutation.isPending ? (
+                    <Loader2 className="size-4 animate-spin" aria-hidden />
+                  ) : null}
+                  Cancel invitation
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      ) : null}
+    </div>
+  )
+}
