@@ -19,7 +19,6 @@ import {
 import { usePaginatedRows } from '@/hooks/use-paginated-rows'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { env } from '@/config/env'
 import {
   createTestBook,
   deleteTestBook,
@@ -49,14 +48,14 @@ export default function TestsBooksPage() {
   const { data: subjects = [] } = useQuery({
     queryKey: qkSubjects,
     queryFn: fetchTestSubjects,
-    enabled: Boolean(env.testApiBaseUrl),
+    enabled: true,
   })
 
   const booksParams = subjectFilter ? { subjectUuid: subjectFilter } : {}
   const { data = [], isLoading, isError, error } = useQuery({
     queryKey: [...qkBooks, booksParams],
     queryFn: () => fetchTestBooks(booksParams),
-    enabled: Boolean(env.testApiBaseUrl),
+    enabled: true,
   })
 
   const filteredRows = useMemo(() => {
@@ -153,24 +152,6 @@ export default function TestsBooksPage() {
     e.preventDefault()
     if (dialog?.mode === 'create') createMu.mutate()
     else if (dialog?.mode === 'edit') updateMu.mutate()
-  }
-
-  if (!env.testApiBaseUrl) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Configure test API</CardTitle>
-          <CardDescription>
-            Set <code className="text-xs">VITE_TEST_BANK_API_BASE_URL</code> in{' '}
-            <code className="text-xs">.env</code> (e.g.{' '}
-            <code className="text-xs">http://localhost:4010/api/v1</code>). If the test service uses{' '}
-            <code className="text-xs">TEST_BANK_API_KEY</code>, set{' '}
-            <code className="text-xs">VITE_TEST_BANK_API_KEY</code> to the same value, then restart
-            the dev server.
-          </CardDescription>
-        </CardHeader>
-      </Card>
-    )
   }
 
   return (

@@ -1,4 +1,4 @@
-import { testApi } from '@/lib/http/test-api-client'
+import { apiClient } from '@/lib/http/api-client'
 
 /** @param {import('axios').AxiosResponse} res */
 function unwrap(res) {
@@ -12,101 +12,101 @@ function unwrap(res) {
 }
 
 export async function fetchTestSuites() {
-  const res = await testApi.get('/bank/suites')
+  const res = await apiClient.get('/bank/suites')
   return unwrap(res).suites
 }
 
 export async function createTestSuite(payload) {
-  const res = await testApi.post('/bank/suites', payload)
+  const res = await apiClient.post('/bank/suites', payload)
   return unwrap(res).suite
 }
 
 export async function updateTestSuite(uuid, payload) {
-  const res = await testApi.patch(`/bank/suites/${uuid}`, payload)
+  const res = await apiClient.patch(`/bank/suites/${uuid}`, payload)
   return unwrap(res).suite
 }
 
 export async function deleteTestSuite(uuid) {
-  const res = await testApi.delete(`/bank/suites/${uuid}`)
+  const res = await apiClient.delete(`/bank/suites/${uuid}`)
   return unwrap(res)
 }
 
 export async function fetchTestSubjects() {
-  const res = await testApi.get('/bank/subjects')
+  const res = await apiClient.get('/bank/subjects')
   return unwrap(res).subjects
 }
 
 export async function createTestSubject(payload) {
-  const res = await testApi.post('/bank/subjects', payload)
+  const res = await apiClient.post('/bank/subjects', payload)
   return unwrap(res).subject
 }
 
 export async function updateTestSubject(uuid, payload) {
-  const res = await testApi.patch(`/bank/subjects/${uuid}`, payload)
+  const res = await apiClient.patch(`/bank/subjects/${uuid}`, payload)
   return unwrap(res).subject
 }
 
 export async function deleteTestSubject(uuid) {
-  const res = await testApi.delete(`/bank/subjects/${uuid}`)
+  const res = await apiClient.delete(`/bank/subjects/${uuid}`)
   return unwrap(res)
 }
 
 export async function fetchTestBooks(params = {}) {
-  const res = await testApi.get('/bank/books', { params })
+  const res = await apiClient.get('/bank/books', { params })
   return unwrap(res).books
 }
 
 export async function createTestBook(payload) {
-  const res = await testApi.post('/bank/books', payload)
+  const res = await apiClient.post('/bank/books', payload)
   return unwrap(res).book
 }
 
 export async function updateTestBook(uuid, payload) {
-  const res = await testApi.patch(`/bank/books/${uuid}`, payload)
+  const res = await apiClient.patch(`/bank/books/${uuid}`, payload)
   return unwrap(res).book
 }
 
 export async function deleteTestBook(uuid) {
-  const res = await testApi.delete(`/bank/books/${uuid}`)
+  const res = await apiClient.delete(`/bank/books/${uuid}`)
   return unwrap(res)
 }
 
 export async function fetchTestQuestions(params = {}) {
-  const res = await testApi.get('/bank/questions', { params })
+  const res = await apiClient.get('/bank/questions', { params })
   return unwrap(res).questions
 }
 
 export async function createTestQuestion(payload) {
-  const res = await testApi.post('/bank/questions', payload)
+  const res = await apiClient.post('/bank/questions', payload)
   return unwrap(res).question
 }
 
 export async function updateTestQuestion(uuid, payload) {
-  const res = await testApi.patch(`/bank/questions/${uuid}`, payload)
+  const res = await apiClient.patch(`/bank/questions/${uuid}`, payload)
   return unwrap(res).question
 }
 
 export async function deleteTestQuestion(uuid) {
-  const res = await testApi.delete(`/bank/questions/${uuid}`)
+  const res = await apiClient.delete(`/bank/questions/${uuid}`)
   return unwrap(res)
 }
 
 export async function fetchTestPackages() {
-  const res = await testApi.get('/bank/packages')
+  const res = await apiClient.get('/bank/packages')
   return unwrap(res).packages
 }
 
 export async function createTestPackage(payload) {
-  const res = await testApi.post('/bank/packages', payload)
+  const res = await apiClient.post('/bank/packages', payload)
   return unwrap(res).package
 }
 
 export async function updateTestPackage(uuid, payload) {
-  const res = await testApi.patch(`/bank/packages/${uuid}`, payload)
+  const res = await apiClient.patch(`/bank/packages/${uuid}`, payload)
   return unwrap(res).package
 }
 
 export async function deleteTestPackage(uuid) {
-  const res = await testApi.delete(`/bank/packages/${uuid}`)
+  const res = await apiClient.delete(`/bank/packages/${uuid}`)
   return unwrap(res)
 }

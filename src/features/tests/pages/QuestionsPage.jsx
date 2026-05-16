@@ -19,7 +19,6 @@ import {
 import { usePaginatedRows } from '@/hooks/use-paginated-rows'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { env } from '@/config/env'
 import { DIFFICULTY_OPTIONS, QUESTION_TYPE_OPTIONS } from '@/features/tests/constants'
 import {
   createTestQuestion,
@@ -62,21 +61,21 @@ export default function TestsQuestionsPage() {
   const { data: subjects = [] } = useQuery({
     queryKey: qkSubjects,
     queryFn: fetchTestSubjects,
-    enabled: Boolean(env.testApiBaseUrl),
+    enabled: true,
   })
 
   const booksParams = subjectFilter ? { subjectUuid: subjectFilter } : {}
   const { data: booksForFilter = [] } = useQuery({
     queryKey: [...qkBooks, booksParams],
     queryFn: () => fetchTestBooks(booksParams),
-    enabled: Boolean(env.testApiBaseUrl),
+    enabled: true,
   })
 
   const listParams = subjectFilter ? { subjectUuid: subjectFilter } : {}
   const { data = [], isLoading, isError, error } = useQuery({
     queryKey: [...qkQ, listParams],
     queryFn: () => fetchTestQuestions(listParams),
-    enabled: Boolean(env.testApiBaseUrl),
+    enabled: true,
   })
 
   const filteredRows = useMemo(() => {
@@ -166,7 +165,7 @@ export default function TestsQuestionsPage() {
   const { data: booksForForm = [] } = useQuery({
     queryKey: [...qkBooks, 'form', booksForFormParams],
     queryFn: () => fetchTestBooks(booksForFormParams),
-    enabled: Boolean(env.testApiBaseUrl && dialog && form.subjectUuid),
+    enabled: Boolean(dialog && form.subjectUuid),
   })
 
   function openCreate() {
@@ -232,24 +231,6 @@ export default function TestsQuestionsPage() {
       ...s,
       options: s.options.filter((_, i) => i !== index),
     }))
-  }
-
-  if (!env.testApiBaseUrl) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Configure test API</CardTitle>
-          <CardDescription>
-            Set <code className="text-xs">VITE_TEST_BANK_API_BASE_URL</code> in{' '}
-            <code className="text-xs">.env</code> (e.g.{' '}
-            <code className="text-xs">http://localhost:4010/api/v1</code>). If the test service uses{' '}
-            <code className="text-xs">TEST_BANK_API_KEY</code>, set{' '}
-            <code className="text-xs">VITE_TEST_BANK_API_KEY</code> to the same value, then restart
-            the dev server.
-          </CardDescription>
-        </CardHeader>
-      </Card>
-    )
   }
 
   return (

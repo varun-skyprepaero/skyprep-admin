@@ -18,7 +18,6 @@ import {
 import { usePaginatedRows } from '@/hooks/use-paginated-rows'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { env } from '@/config/env'
 import { DIFFICULTY_OPTIONS, QUESTION_TYPE_OPTIONS } from '@/features/tests/constants'
 import {
   createTestPackage,
@@ -59,19 +58,19 @@ export default function TestsPackagesPage() {
   const { data: subjects = [] } = useQuery({
     queryKey: qkSubjects,
     queryFn: fetchTestSubjects,
-    enabled: Boolean(env.testApiBaseUrl),
+    enabled: true,
   })
 
   const { data: suites = [] } = useQuery({
     queryKey: qkSuites,
     queryFn: fetchTestSuites,
-    enabled: Boolean(env.testApiBaseUrl),
+    enabled: true,
   })
 
   const { data = [], isLoading, isError, error } = useQuery({
     queryKey: qkPkgs,
     queryFn: fetchTestPackages,
-    enabled: Boolean(env.testApiBaseUrl),
+    enabled: true,
   })
 
   const booksParams =
@@ -80,7 +79,7 @@ export default function TestsPackagesPage() {
   const { data: booksForPackage = [] } = useQuery({
     queryKey: ['tests', 'books', 'package', booksParams],
     queryFn: () => fetchTestBooks(booksParams),
-    enabled: Boolean(env.testApiBaseUrl && dialog && form.subjectUuids.length > 0),
+    enabled: Boolean(dialog && form.subjectUuids.length > 0),
   })
 
   const filteredRows = useMemo(() => {
@@ -242,24 +241,6 @@ export default function TestsPackagesPage() {
     e.preventDefault()
     if (dialog?.mode === 'create') createMu.mutate()
     else if (dialog?.mode === 'edit') updateMu.mutate()
-  }
-
-  if (!env.testApiBaseUrl) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Configure test API</CardTitle>
-          <CardDescription>
-            Set <code className="text-xs">VITE_TEST_BANK_API_BASE_URL</code> in{' '}
-            <code className="text-xs">.env</code> (e.g.{' '}
-            <code className="text-xs">http://localhost:4010/api/v1</code>). If the test service uses{' '}
-            <code className="text-xs">TEST_BANK_API_KEY</code>, set{' '}
-            <code className="text-xs">VITE_TEST_BANK_API_KEY</code> to the same value, then restart the
-            dev server.
-          </CardDescription>
-        </CardHeader>
-      </Card>
-    )
   }
 
   return (
