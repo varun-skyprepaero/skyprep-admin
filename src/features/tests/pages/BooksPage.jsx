@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Loader2, Plus, Pencil, Trash2 } from 'lucide-react'
+import { Loader2, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -11,8 +11,10 @@ import {
 } from '@/components/ui/card'
 import {
   DataTable,
+  DataTableActionsHeader,
   DataTableContent,
   DataTablePagination,
+  DataTableRowActions,
   DataTableToolbar,
   dataTableSelectClass,
 } from '@/components/ui/data-table'
@@ -206,7 +208,7 @@ export default function TestsBooksPage() {
                       <th className="px-4 py-3 font-medium">Subject</th>
                       <th className="px-4 py-3 font-medium">Author</th>
                       <th className="px-4 py-3 font-medium">Qs</th>
-                      <th className="px-4 py-3 font-medium text-right">Actions</th>
+                      <DataTableActionsHeader />
                     </tr>
                   </thead>
                   <tbody>
@@ -225,33 +227,26 @@ export default function TestsBooksPage() {
                           <td className="px-4 py-3">{row.subject ? row.subject.name : '—'}</td>
                           <td className="px-4 py-3">{row.author ?? '—'}</td>
                           <td className="px-4 py-3">{row.questionCount ?? '—'}</td>
-                          <td className="px-4 py-3 text-right">
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="mr-1"
-                              onClick={() => openEdit(row)}
-                              aria-label="Edit book"
-                            >
-                              <Pencil className="size-4" aria-hidden />
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="text-destructive hover:text-destructive"
-                              disabled={deleteMu.isPending}
-                              onClick={() => {
-                                if (window.confirm(`Delete book “${row.title}”?`)) {
-                                  deleteMu.mutate(row.uuid)
-                                }
-                              }}
-                              aria-label="Delete book"
-                            >
-                              <Trash2 className="size-4" aria-hidden />
-                            </Button>
-                          </td>
+                          <DataTableRowActions
+                            rowId={row.uuid}
+                            disabled={deleteMu.isPending}
+                            items={[
+                              {
+                                label: 'Edit',
+                                onClick: () => openEdit(row),
+                              },
+                              {
+                                label: 'Delete',
+                                destructive: true,
+                                disabled: deleteMu.isPending,
+                                onClick: () => {
+                                  if (window.confirm(`Delete book “${row.title}”?`)) {
+                                    deleteMu.mutate(row.uuid)
+                                  }
+                                },
+                              },
+                            ]}
+                          />
                         </tr>
                       ))
                     )}

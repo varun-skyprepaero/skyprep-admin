@@ -1,7 +1,18 @@
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
-import { ChevronLeft, ChevronRight, Search } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Loader2, MoreHorizontal, Search } from 'lucide-react'
+
+/**
+ * @typedef {{
+ *   label: string,
+ *   onClick: () => void,
+ *   destructive?: boolean,
+ *   disabled?: boolean,
+ * }} DataTableRowActionItem
+ */
 
 /** Shared styles for native `<select>` in table toolbars and pagination. */
 export const dataTableSelectClass =
@@ -145,3 +156,133 @@ export function DataTablePagination({
 export function DataTableContent({ className, children }) {
   return <div className={cn('overflow-x-auto', className)}>{children}</div>
 }
+
+/** Narrow actions column header — pair with {@link DataTableRowActions}. */
+export function DataTableActionsHeader({ className }) {
+  return (
+    <th
+      className={cn('h-11 w-12 px-2 align-middle lg:px-3', className)}
+      aria-label="Actions"
+    />
+  )
+}
+
+/**
+ * Per-row ⋯ menu for edit/delete and other row actions.
+ *
+ * @param {{
+ *   rowId: string,
+ *   items: DataTableRowActionItem[],
+ *   busy?: boolean,
+ *   disabled?: boolean,
+ *   className?: string,
+ * }} props
+ */
+export function DataTableRowActions({ rowId, items, busy = false, disabled = false, className }) {
+  const [open, setOpen] = useState(false)
+  const [menuStyle, setMenuStyle] = useState(
+    /** @type {{ top: number, left: number } | null} */ (null),
+  )
+  const triggerRef = useRef(/** @type {HTMLButtonElement | null} */ (null))
+  const panelRef = useRef(/** @type {HTMLDivElement | null} */ (null))
+
+  useLayoutEffect(() => {
+    if (!open || !triggerRef.current) {
+      setMenuStyle(null)
+      return
+    }
+    function updatePosition() {
+      const trigger = triggerRef.current
+      if (!trigger) return
+      const rect = trigger.getBoundingClientRect()
+      setMenuStyle({
+        top: rect.bottom + 4,
+        left: rect.right,
+      })
+    }
+    updatePosition()
+    window.addEventListener('resize', updatePosition)
+    window.addEventListener('scroll', updatePosition, true)
+    return () => {
+      window.removeEventListener('resize', updatePosition)
+      window.removeEventListener('scroll', updatePosition, true)
+    }
+  }, [open])
+
+  useEffect(() => {
+    if (!open) return
+    function onPointerDown(e) {
+      const target = /** @type {Node} */ (e.target)
+      if (panelRef.current?.contains(target)) return
+      if (triggerRef.current?.contains(target)) return
+      setOpen(false)
+    }
+    const frame = requestAnimationFrame(() => {
+      document.addEventListener('mousedown', onPointerDown)
+    })
+    return () => {
+      cancelAnimationFrame(frame)
+      document.removeEventListener('mousedown', onPointerDown)
+    }
+  }, [open])
+
+  const menu =
+    open && menuStyle
+      ? createPortal(
+          <div
+            ref={panelRef}
+            className="fixed z-[200] min-w-[10rem] -translate-x-full rounded-md border border-border bg-popover py-1 text-popover-foreground shadow-md"
+            style={{ top: menuStyle.top, left: menuStyle.left }}
+            role="menu"
+          >
+            {items.map((item) => (
+              <button
+                key={item.label}
+                type="button"
+                role="menuitem"
+                className={cn(
+                  'flex w-full px-3 py-2 text-left text-sm hover:bg-accent disabled:pointer-events-none disabled:opacity-50',
+                  item.destructive && 'text-destructive hover:bg-destructive/10',
+                )}
+                disabled={disabled || item.disabled}
+                onClick={() => {
+                  setOpen(false)
+                  item.onClick()
+                }}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>,
+          document.body,
+        )
+      : null
+
+  return (
+    <td className={cn('px-2 py-3 align-middle lg:px-3', className)}>
+      <div className="flex justify-end">
+        <Button
+          ref={triggerRef}
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="size-8"
+          data-row-menu-trigger={rowId}
+          aria-label="Open row actions"
+          aria-expanded={open}
+          aria-haspopup="menu"
+          disabled={disabled}
+          onClick={() => setOpen((prev) => !prev)}
+        >
+          {busy ? (
+            <Loader2 className="size-4 animate-spin" aria-hidden />
+          ) : (
+            <MoreHorizontal className="size-4" aria-hidden />
+          )}
+        </Button>
+      </div>
+      {menu}
+    </td>
+  )
+}
+

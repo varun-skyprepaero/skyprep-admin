@@ -11,3 +11,8 @@ export const DIFFICULTY_OPTIONS = [
   { value: 'MEDIUM', label: 'Medium' },
   { value: 'HARD', label: 'Hard' },
 ]
+
+export const CURRENCY_OPTIONS = [
+  { value: 'INR', label: 'INR' },
+  { value: 'USD', label: 'USD' },
+]

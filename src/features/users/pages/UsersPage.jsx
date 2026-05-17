@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Navigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
@@ -13,6 +13,7 @@ import {
   DataTable,
   DataTableContent,
   DataTablePagination,
+  DataTableRowActions,
   DataTableToolbar,
   dataTableSelectClass,
 } from '@/components/ui/data-table'
@@ -31,7 +32,7 @@ import { handleApiError } from '@/lib/http/api-error'
 import { notifyError, notifySuccess } from '@/lib/notifications'
 import { useAuthStore } from '@/stores/auth-store'
 import { cn } from '@/lib/utils'
-import { Loader2, MoreHorizontal, UserPlus, X } from 'lucide-react'
+import { Loader2, UserPlus, X } from 'lucide-react'
 
 const usersQueryKey = ['admin', 'users', USER_ENDPOINTS.list]
 const invitationsQueryKey = ['admin', 'invitations', 'pending']
@@ -241,9 +242,6 @@ export default function UsersPage() {
   const [roleName, setRoleName] = useState(INVITABLE_ROLE_OPTIONS[0].value)
   const [inviteErrors, setInviteErrors] = useState({})
 
-  const [menuOpenFor, setMenuOpenFor] = useState(/** @type {string | null} */ (null))
-  const menuPanelRef = useRef(/** @type {HTMLDivElement | null} */ (null))
-
   const [editUser, setEditUser] = useState(
     /** @type {null | { uuid: string, firstName: string, lastName: string, isActive: boolean, roleName: string | null }} */ (
       null
@@ -261,19 +259,6 @@ export default function UsersPage() {
   const [signupSourceFilter, setSignupSourceFilter] = useState('all')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
-
-  useEffect(() => {
-    if (!menuOpenFor) return
-    function onPointerDown(e) {
-      const el = menuPanelRef.current
-      if (el?.contains(e.target)) return
-      const toggler = document.querySelector(`[data-row-menu-trigger="${menuOpenFor}"]`)
-      if (toggler?.contains(e.target)) return
-      setMenuOpenFor(null)
-    }
-    document.addEventListener('mousedown', onPointerDown)
-    return () => document.removeEventListener('mousedown', onPointerDown)
-  }, [menuOpenFor])
 
   const usersQuery = useQuery({
     queryKey: usersQueryKey,
@@ -671,72 +656,37 @@ export default function UsersPage() {
                               </div>
                             )}
                           </td>
-                          <td className="relative px-2 py-3 align-middle lg:px-3">
-                            <div className="flex justify-end">
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                className="size-8"
-                                data-row-menu-trigger={row.key}
-                                aria-label="Open row actions"
-                                aria-expanded={menuOpenFor === row.key}
-                                onClick={() =>
-                                  setMenuOpenFor((prev) => (prev === row.key ? null : row.key))
-                                }
-                                disabled={
-                                  resending ||
-                                  cancelInviteMutation.isPending ||
-                                  adminUpdateMutation.isPending
-                                }
-                              >
-                                {resending ? (
-                                  <Loader2 className="size-4 animate-spin" aria-hidden />
-                                ) : (
-                                  <MoreHorizontal className="size-4" aria-hidden />
-                                )}
-                              </Button>
-                            </div>
-                            {menuOpenFor === row.key ? (
-                              <div
-                                ref={menuPanelRef}
-                                className="absolute right-4 top-full z-50 mt-1 min-w-[12rem] rounded-md border border-border bg-popover py-1 text-popover-foreground shadow-md"
-                                role="menu"
-                              >
-                                {row.kind === 'invite' ? (
-                                  <>
-                                    <button
-                                      type="button"
-                                      role="menuitem"
-                                      className="flex w-full px-3 py-2 text-left text-sm hover:bg-accent"
-                                      onClick={() => resendMutation.mutate(row.uuid)}
-                                      disabled={resendMutation.isPending}
-                                    >
-                                      Resend invitation
-                                    </button>
-                                    <button
-                                      type="button"
-                                      role="menuitem"
-                                      className="flex w-full px-3 py-2 text-left text-sm text-destructive hover:bg-destructive/10"
-                                      onClick={() => openCancelInviteConfirm(row)}
-                                      disabled={cancelInviteMutation.isPending}
-                                    >
-                                      Cancel invitation
-                                    </button>
-                                  </>
-                                ) : (
-                                  <button
-                                    type="button"
-                                    role="menuitem"
-                                    className="flex w-full px-3 py-2 text-left text-sm hover:bg-accent"
-                                    onClick={() => openEditForUser(row)}
-                                  >
-                                    Edit user
-                                  </button>
-                                )}
-                              </div>
-                            ) : null}
-                          </td>
+                          <DataTableRowActions
+                            rowId={row.key}
+                            busy={resending}
+                            disabled={
+                              resending ||
+                              cancelInviteMutation.isPending ||
+                              adminUpdateMutation.isPending
+                            }
+                            items={
+                              row.kind === 'invite'
+                                ? [
+                                    {
+                                      label: 'Resend invitation',
+                                      onClick: () => resendMutation.mutate(row.uuid),
+                                      disabled: resendMutation.isPending,
+                                    },
+                                    {
+                                      label: 'Cancel invitation',
+                                      destructive: true,
+                                      onClick: () => openCancelInviteConfirm(row),
+                                      disabled: cancelInviteMutation.isPending,
+                                    },
+                                  ]
+                                : [
+                                    {
+                                      label: 'Edit user',
+                                      onClick: () => openEditForUser(row),
+                                    },
+                                  ]
+                            }
+                          />
                         </tr>
                       )
                     })
