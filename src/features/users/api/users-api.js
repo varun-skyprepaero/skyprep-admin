@@ -26,3 +26,20 @@ export async function adminUpdateUser(userUuid, payload) {
     throw toApiClientError(error)
   }
 }
+
+/**
+ * @param {string} userUuid
+ * @returns {Promise<{ classroomUrl: string, targetEmail?: string }>}
+ */
+export async function createClassroomImpersonateLink(userUuid) {
+  try {
+    const { data } = await apiClient.post(USER_ENDPOINTS.classroomImpersonate(userUuid))
+    const payload = data?.data
+    if (!payload?.classroomUrl) {
+      throw new Error('Could not create Classroom sign-in link')
+    }
+    return payload
+  } catch (error) {
+    throw toApiClientError(error)
+  }
+}

@@ -173,12 +173,20 @@ export function DataTableActionsHeader({ className }) {
  * @param {{
  *   rowId: string,
  *   items: DataTableRowActionItem[],
+ *   leading?: React.ReactNode,
  *   busy?: boolean,
  *   disabled?: boolean,
  *   className?: string,
  * }} props
  */
-export function DataTableRowActions({ rowId, items, busy = false, disabled = false, className }) {
+export function DataTableRowActions({
+  rowId,
+  items,
+  leading = null,
+  busy = false,
+  disabled = false,
+  className,
+}) {
   const [open, setOpen] = useState(false)
   const [menuStyle, setMenuStyle] = useState(
     /** @type {{ top: number, left: number } | null} */ (null),
@@ -260,7 +268,8 @@ export function DataTableRowActions({ rowId, items, busy = false, disabled = fal
 
   return (
     <td className={cn('px-2 py-3 align-middle lg:px-3', className)}>
-      <div className="flex justify-end">
+      <div className="flex items-center justify-end gap-1">
+        {leading}
         <Button
           ref={triggerRef}
           type="button"

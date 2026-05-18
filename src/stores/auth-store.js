@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { AUTH_STORAGE_KEY } from '@/lib/storage-keys'
-import { isAdminUser } from '@/features/auth/lib/is-admin-user'
+import { isStaffUser } from '@/features/auth/lib/is-staff-user'
 import {
   canRefreshSession,
   hasValidAccessToken,
@@ -34,7 +34,7 @@ export const useAuthStore = create(
           tokenType: session.tokenType ?? 'Bearer',
           sessionRefreshIntervalSeconds: session.sessionRefreshIntervalSeconds ?? null,
           lastSessionRefreshAt: session.lastSessionRefreshAt ?? new Date().toISOString(),
-          isAuthenticated: Boolean(session.accessToken && user && isAdminUser(user)),
+          isAuthenticated: Boolean(session.accessToken && user && isStaffUser(user)),
         })
       },
 
@@ -42,7 +42,7 @@ export const useAuthStore = create(
         const { accessToken } = get()
         set({
           user,
-          isAuthenticated: Boolean(accessToken && user && isAdminUser(user)),
+          isAuthenticated: Boolean(accessToken && user && isStaffUser(user)),
         })
       },
 
@@ -74,7 +74,7 @@ export const useAuthStore = create(
           return
         }
 
-        if (hasValidAccessToken(state) && isAdminUser(state.user)) {
+        if (hasValidAccessToken(state) && isStaffUser(state.user)) {
           const patch = { isAuthenticated: true }
           if (!state.lastSessionRefreshAt) {
             patch.lastSessionRefreshAt = new Date().toISOString()

@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { getUserProfile } from '@/features/auth/api/auth-api'
-import { isAdminUser } from '@/features/auth/lib/is-admin-user'
+import { isStaffUser } from '@/features/auth/lib/is-staff-user'
 import { useAuthStore } from '@/stores/auth-store'
 
 export function AuthBootstrap() {
@@ -28,7 +28,7 @@ export function AuthBootstrap() {
         const profile = await getUserProfile(uuid)
         if (cancelled) return
 
-        if (!isAdminUser(profile)) {
+        if (!isStaffUser(profile)) {
           logout()
           return
         }

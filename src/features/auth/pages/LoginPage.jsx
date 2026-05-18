@@ -13,15 +13,15 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { getUserProfile, login, toAuthSession } from '@/features/auth/api/auth-api'
-import { isAdminUser } from '@/features/auth/lib/is-admin-user'
+import { isStaffUser } from '@/features/auth/lib/is-staff-user'
 import { validateLoginForm } from '@/features/auth/lib/validate-login-form'
 import { env } from '@/config/env'
 import { handleApiError } from '@/lib/http/api-error'
 import { notifyError, notifySuccess } from '@/lib/notifications'
 import { useAuthStore } from '@/stores/auth-store'
 
-const ADMIN_ACCESS_DENIED =
-  'This portal is for administrators only. Sign in with a Super Admin or Admin account.'
+const STAFF_ACCESS_DENIED =
+  'This portal is for staff only. Students must sign in through the Classroom app.'
 
 export default function LoginPage() {
   const [form, setForm] = useState({ email: '', password: '' })
@@ -54,9 +54,9 @@ export default function LoginPage() {
     onSuccess: ({ response, profile, session }) => {
       setErrors({})
 
-      if (!isAdminUser(profile)) {
+      if (!isStaffUser(profile)) {
         logout()
-        notifyError(ADMIN_ACCESS_DENIED)
+        notifyError(STAFF_ACCESS_DENIED)
         return
       }
 
@@ -67,9 +67,13 @@ export default function LoginPage() {
       navigate(from || '/', { replace: true })
     },
     onError: (error) => {
-      const { message, fieldErrors } = handleApiError(error, 'Unable to sign in')
+      const { message, fieldErrors, errorCode } = handleApiError(error, 'Unable to sign in')
       const next = { ...fieldErrors }
-      if (message) next.root = message
+      if (errorCode === 'ADMIN_STAFF_ONLY') {
+        next.root = STAFF_ACCESS_DENIED
+      } else if (message) {
+        next.root = message
+      }
       setErrors(next)
     },
   })

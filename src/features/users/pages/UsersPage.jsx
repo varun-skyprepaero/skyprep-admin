@@ -27,12 +27,16 @@ import {
   resendInvitation,
 } from '@/features/invitations/api/invitations-api'
 import { INVITABLE_ROLE_OPTIONS, SUPER_ADMIN_ROLE_NAME } from '@/features/invitations/constants'
+import { ClassroomImpersonateDialog } from '@/features/users/components/ClassroomImpersonateDialog'
 import { adminUpdateUser, fetchUsers } from '@/features/users/api/users-api'
 import { handleApiError } from '@/lib/http/api-error'
 import { notifyError, notifySuccess } from '@/lib/notifications'
 import { useAuthStore } from '@/stores/auth-store'
 import { cn } from '@/lib/utils'
-import { Loader2, UserPlus, X } from 'lucide-react'
+import { Loader2, LogIn, UserPlus, X } from 'lucide-react'
+
+const STUDENT_ROLE_NAME = 'Student'
+
 
 const usersQueryKey = ['admin', 'users', USER_ENDPOINTS.list]
 const invitationsQueryKey = ['admin', 'invitations', 'pending']
@@ -251,6 +255,9 @@ export default function UsersPage() {
   const [cancelInviteTarget, setCancelInviteTarget] = useState(
     /** @type {null | { uuid: string, email: string }} */ (null),
   )
+  const [classroomImpersonateTarget, setClassroomImpersonateTarget] = useState(
+    /** @type {null | { uuid: string, email: string, name: string }} */ (null),
+  )
 
   const [tableSearch, setTableSearch] = useState('')
   const [typeFilter, setTypeFilter] = useState('all')
@@ -333,7 +340,6 @@ export default function UsersPage() {
     mutationFn: (/** @type {string} */ invitationUuid) => resendInvitation(invitationUuid),
     onSuccess: (response) => {
       notifySuccess(response?.message ?? 'Invitation resent')
-      setMenuOpenFor(null)
       invalidatePeople()
       const url = response?.data?.signupUrl
       if (url && import.meta.env.DEV) console.info('[invite] resent URL', url)
@@ -348,8 +354,7 @@ export default function UsersPage() {
     mutationFn: (/** @type {string} */ invitationUuid) => cancelInvitation(invitationUuid),
     onSuccess: (response) => {
       notifySuccess(response?.message ?? 'Invitation cancelled')
-      setMenuOpenFor(null)
-      setCancelInviteTarget(null)
+    setCancelInviteTarget(null)
       invalidatePeople()
     },
     onError: (error) => {
@@ -357,6 +362,16 @@ export default function UsersPage() {
       notifyError(message || 'Unable to cancel invitation')
     },
   })
+
+  function openClassroomAsUser(row) {
+    if (row.kind !== 'user') return
+    const name = [row.firstName, row.lastName].filter(Boolean).join(' ') || row.email || 'Student'
+    setClassroomImpersonateTarget({
+      uuid: row.uuid,
+      email: row.email ?? '',
+      name,
+    })
+  }
 
   const adminUpdateMutation = useMutation({
     mutationFn: (/** @type {{ uuid: string, payload: { firstName?: string, lastName?: string | null, isActive?: boolean } }} */ vars) =>
@@ -392,7 +407,6 @@ export default function UsersPage() {
 
   function openCancelInviteConfirm(row) {
     if (row.kind !== 'invite') return
-    setMenuOpenFor(null)
     setCancelInviteTarget({ uuid: row.uuid, email: row.email ?? '' })
   }
 
@@ -411,7 +425,6 @@ export default function UsersPage() {
       isActive: Boolean(row.isActive),
       roleName: row.roleName,
     })
-    setMenuOpenFor(null)
   }
 
   function submitEdit(e) {
@@ -576,7 +589,9 @@ export default function UsersPage() {
                     <th className="h-11 px-4 align-middle font-medium lg:px-6">Signup</th>
                     <th className="h-11 px-4 align-middle font-medium lg:px-6">Account</th>
                     <th className="h-11 px-4 align-middle font-medium lg:px-6">Invitation</th>
-                    <th className="h-11 w-12 px-2 align-middle lg:px-3" aria-label="Actions" />
+                    <th className="h-11 w-24 px-2 align-middle text-right lg:px-3">
+                      <span className="sr-only">Actions</span>
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/60 [&_tr:last-child]:border-0">
@@ -663,6 +678,23 @@ export default function UsersPage() {
                               resending ||
                               cancelInviteMutation.isPending ||
                               adminUpdateMutation.isPending
+                            }
+                            leading={
+                              row.kind === 'user' &&
+                              row.roleName === STUDENT_ROLE_NAME &&
+                              row.isActive ? (
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="icon"
+                                  className="size-8 shrink-0"
+                                  title="Open Classroom as this student"
+                                  aria-label={`Open Classroom as ${displayName || row.email}`}
+                                  onClick={() => openClassroomAsUser(row)}
+                                >
+                                  <LogIn className="size-4" aria-hidden />
+                                </Button>
+                              ) : null
                             }
                             items={
                               row.kind === 'invite'
@@ -916,6 +948,11 @@ export default function UsersPage() {
           </Card>
         </div>
       ) : null}
+
+      <ClassroomImpersonateDialog
+        target={classroomImpersonateTarget}
+        onClose={() => setClassroomImpersonateTarget(null)}
+      />
 
       {cancelInviteTarget ? (
         <div

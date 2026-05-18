@@ -18,10 +18,16 @@ export function toApiClientError(error) {
       fieldErrors[details.field] = message
     }
 
+    const errorCode =
+      details && typeof details === 'object' && typeof details.code === 'string'
+        ? details.code
+        : null
+
     return {
       message,
       statusCode,
       fieldErrors,
+      errorCode,
       isApiError: true,
     }
   }
@@ -40,5 +46,6 @@ export function handleApiError(error, fallback) {
     message: parsed.message || fallback,
     fieldErrors: parsed.fieldErrors,
     statusCode: parsed.statusCode,
+    errorCode: parsed.errorCode ?? null,
   }
 }

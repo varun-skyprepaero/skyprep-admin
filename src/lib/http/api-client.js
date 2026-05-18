@@ -1,6 +1,10 @@
 import axios from 'axios'
 import { env } from '@/config/env'
 import { refreshAccessToken } from '@/lib/auth/token-refresh'
+import {
+  SKYPREP_CLIENT_ADMIN,
+  SKYPREP_CLIENT_HEADER,
+} from '@/lib/http/client-app-header'
 import { authStore } from '@/stores/auth-store'
 
 if (env.isDev && !env.apiBaseUrl) {
@@ -15,6 +19,7 @@ export const apiClient = axios.create({
   headers: {
     'Content-Type': 'application/json',
     Accept: 'application/json',
+    [SKYPREP_CLIENT_HEADER]: SKYPREP_CLIENT_ADMIN,
   },
 })
 

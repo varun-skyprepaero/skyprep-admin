@@ -1,6 +1,10 @@
 import axios from 'axios'
 import { env } from '@/config/env'
 import { AUTH_ENDPOINTS } from '@/features/auth/constants'
+import {
+  SKYPREP_CLIENT_ADMIN,
+  SKYPREP_CLIENT_HEADER,
+} from '@/lib/http/client-app-header'
 import { toAuthSession } from '@/features/auth/lib/to-auth-session'
 import { authStore } from '@/stores/auth-store'
 
@@ -26,6 +30,7 @@ export async function refreshAccessToken() {
           headers: {
             'Content-Type': 'application/json',
             Accept: 'application/json',
+            [SKYPREP_CLIENT_HEADER]: SKYPREP_CLIENT_ADMIN,
           },
           timeout: 30_000,
         },

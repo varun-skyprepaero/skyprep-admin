@@ -18,4 +18,5 @@ export const USER_ENDPOINTS = {
   list: '/users',
   profile: (uuid) => `/users/${uuid}`,
   adminUpdate: (uuid) => `/users/${uuid}/admin`,
+  classroomImpersonate: (uuid) => `/users/${uuid}/classroom-impersonate`,
 }
