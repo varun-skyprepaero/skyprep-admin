@@ -27,6 +27,12 @@ import {
   resendInvitation,
 } from '@/features/invitations/api/invitations-api'
 import { INVITABLE_ROLE_OPTIONS, SUPER_ADMIN_ROLE_NAME } from '@/features/invitations/constants'
+import {
+  canAccessUsersSection,
+  canViewUserInDirectory,
+  invitableRoleOptionsForUser,
+  isSuperAdmin,
+} from '@/features/auth/lib/admin-section-access'
 import { ClassroomImpersonateDialog } from '@/features/users/components/ClassroomImpersonateDialog'
 import { adminUpdateUser, fetchUsers } from '@/features/users/api/users-api'
 import { handleApiError } from '@/lib/http/api-error'
@@ -182,6 +188,12 @@ const ROLE_FILTER_OPTIONS = [
   ...INVITABLE_ROLE_OPTIONS.map((o) => ({ value: o.value, label: o.label })),
 ]
 
+function roleFilterOptionsForUser(user) {
+  return ROLE_FILTER_OPTIONS.filter(
+    (opt) => opt.value === 'all' || canViewUserInDirectory(user, opt.value),
+  )
+}
+
 const TYPE_FILTER_OPTIONS = [
   { value: 'all', label: 'All types' },
   { value: 'member', label: 'Members' },
@@ -270,18 +282,24 @@ export default function UsersPage() {
   const usersQuery = useQuery({
     queryKey: usersQueryKey,
     queryFn: fetchUsers,
-    enabled: Boolean(user?.role?.name === SUPER_ADMIN_ROLE_NAME),
+    enabled: canAccessUsersSection(user),
   })
 
   const invitationsQuery = useQuery({
     queryKey: invitationsQueryKey,
     queryFn: fetchPendingInvitations,
-    enabled: Boolean(user?.role?.name === SUPER_ADMIN_ROLE_NAME),
+    enabled: canAccessUsersSection(user),
   })
 
+  const inviteRoleOptions = useMemo(() => invitableRoleOptionsForUser(user), [user])
+  const roleFilterOptions = useMemo(() => roleFilterOptionsForUser(user), [user])
+
   const rows = useMemo(
-    () => buildTableRows(usersQuery.data ?? [], invitationsQuery.data ?? []),
-    [usersQuery.data, invitationsQuery.data],
+    () =>
+      buildTableRows(usersQuery.data ?? [], invitationsQuery.data ?? []).filter((row) =>
+        canViewUserInDirectory(user, row.roleName),
+      ),
+    [usersQuery.data, invitationsQuery.data, user],
   )
 
   const filterState = useMemo(
@@ -326,7 +344,7 @@ export default function UsersPage() {
         console.info('[invite] signup URL', data.signupUrl)
       }
       setEmail('')
-      setRoleName(INVITABLE_ROLE_OPTIONS[0].value)
+      setRoleName(inviteRoleOptions[0]?.value ?? INVITABLE_ROLE_OPTIONS[0].value)
       setInviteOpen(false)
       invalidatePeople()
     },
@@ -460,9 +478,11 @@ export default function UsersPage() {
     )
   }
 
-  if (user?.role?.name !== SUPER_ADMIN_ROLE_NAME) {
+  if (!canAccessUsersSection(user)) {
     return <Navigate to="/" replace />
   }
+
+  const showClassroomImpersonate = isSuperAdmin(user)
 
   return (
     <div className="space-y-8">
@@ -535,7 +555,7 @@ export default function UsersPage() {
                   }}
                   aria-label="Filter by role"
                 >
-                  {ROLE_FILTER_OPTIONS.map((o) => (
+                  {roleFilterOptions.map((o) => (
                     <option key={o.value} value={o.value}>
                       {o.label}
                     </option>
@@ -680,6 +700,7 @@ export default function UsersPage() {
                               adminUpdateMutation.isPending
                             }
                             leading={
+                              showClassroomImpersonate &&
                               row.kind === 'user' &&
                               row.roleName === STUDENT_ROLE_NAME &&
                               row.isActive ? (
@@ -814,7 +835,7 @@ export default function UsersPage() {
                     onChange={(e) => setRoleName(e.target.value)}
                     disabled={inviteMutation.isPending}
                   >
-                    {INVITABLE_ROLE_OPTIONS.map((opt) => (
+                    {inviteRoleOptions.map((opt) => (
                       <option key={opt.value} value={opt.value}>
                         {opt.label}
                       </option>

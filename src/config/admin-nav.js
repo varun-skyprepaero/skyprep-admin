@@ -9,19 +9,24 @@ import {
   Users,
 } from 'lucide-react'
 
+import {
+  TESTS_SECTION_ROLE_NAMES,
+  USERS_SECTION_ROLE_NAMES,
+} from '@/features/invitations/constants'
+
 export const adminNav = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
   {
     name: 'Users',
     href: '/users',
     icon: Users,
-    superAdminOnly: true,
+    roles: USERS_SECTION_ROLE_NAMES,
   },
   {
     name: 'Tests',
     href: '/tests',
     icon: ClipboardList,
-    superAdminOnly: true,
+    roles: TESTS_SECTION_ROLE_NAMES,
   },
   { name: 'Calendar', href: '/calendar', icon: Calendar, disabled: true },
   { name: 'Focus One', href: '/focus-one', icon: Users, disabled: true },

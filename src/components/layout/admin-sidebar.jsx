@@ -2,7 +2,7 @@ import { NavLink } from 'react-router-dom'
 import { Shield, X } from 'lucide-react'
 import { adminNav } from '@/config/admin-nav'
 import { env } from '@/config/env'
-import { SUPER_ADMIN_ROLE_NAME } from '@/features/invitations/constants'
+import { hasAdminPortalRole } from '@/features/auth/lib/admin-section-access'
 import { useAuthStore } from '@/stores/auth-store'
 import { cn } from '@/lib/utils'
 
@@ -11,14 +11,13 @@ import { cn } from '@/lib/utils'
  */
 export function AdminSidebar({ collapsed = false, mobile = false, onNavigate }) {
   const user = useAuthStore((s) => s.user)
-  const isSuperAdmin = user?.role?.name === SUPER_ADMIN_ROLE_NAME
 
   const displayName = user?.firstName
     ? `${user.firstName}${user.lastName ? ` ${user.lastName}` : ''}`
     : user?.email ?? 'Admin'
 
   const visibleNav = adminNav.filter(
-    (item) => !item.superAdminOnly || isSuperAdmin,
+    (item) => !item.roles || hasAdminPortalRole(user, item.roles),
   )
 
   return (
