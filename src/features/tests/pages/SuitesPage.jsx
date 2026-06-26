@@ -28,6 +28,7 @@ import {
 } from '@/features/tests/api/tests-api'
 import { handleApiError } from '@/lib/http/api-error'
 import { notifyError, notifySuccess } from '@/lib/notifications'
+import { slugifyFromName } from '@/lib/slug'
 
 const qk = ['tests', 'suites']
 
@@ -36,11 +37,12 @@ export default function TestsSuitesPage() {
   const [search, setSearch] = useState('')
   const [dialog, setDialog] = useState(null)
   const [form, setForm] = useState({
-    slug: '',
     name: '',
     description: '',
     sortOrder: '0',
   })
+
+  const slugPreview = slugifyFromName(form.name)
 
   const { data = [], isLoading, isError, error } = useQuery({
     queryKey: qk,
@@ -64,7 +66,7 @@ export default function TestsSuitesPage() {
   const createMu = useMutation({
     mutationFn: () =>
       createTestSuite({
-        slug: form.slug.trim().toLowerCase(),
+        slug: slugifyFromName(form.name),
         name: form.name.trim(),
         description: form.description.trim() || null,
         sortOrder: Number(form.sortOrder) || 0,
@@ -83,7 +85,6 @@ export default function TestsSuitesPage() {
   const updateMu = useMutation({
     mutationFn: () =>
       updateTestSuite(dialog.uuid, {
-        slug: form.slug.trim().toLowerCase(),
         name: form.name.trim(),
         description: form.description.trim() || null,
         sortOrder: Number(form.sortOrder) || 0,
@@ -114,7 +115,6 @@ export default function TestsSuitesPage() {
 
   function openCreate() {
     setForm({
-      slug: '',
       name: '',
       description: '',
       sortOrder: '0',
@@ -124,16 +124,19 @@ export default function TestsSuitesPage() {
 
   function openEdit(row) {
     setForm({
-      slug: row.slug,
       name: row.name,
       description: row.description ?? '',
       sortOrder: String(row.sortOrder ?? 0),
     })
-    setDialog({ mode: 'edit', uuid: row.uuid })
+    setDialog({ mode: 'edit', uuid: row.uuid, slug: row.slug })
   }
 
   function submit(e) {
     e.preventDefault()
+    if (dialog?.mode === 'create' && !slugifyFromName(form.name)) {
+      notifyError('Enter a name that produces a valid slug (letters or numbers).')
+      return
+    }
     if (dialog?.mode === 'create') createMu.mutate()
     else if (dialog?.mode === 'edit') updateMu.mutate()
   }
@@ -244,35 +247,13 @@ export default function TestsSuitesPage() {
           >
             <CardHeader>
               <CardTitle>{dialog.mode === 'create' ? 'New suite' : 'Edit suite'}</CardTitle>
-              <CardDescription>URL slug (e.g. ppl, cpl, atpl) and display name.</CardDescription>
+              <CardDescription>
+                Display name and optional description. The slug is generated from the name and
+                cannot be changed after creation.
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <form className="space-y-4" onSubmit={submit}>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="suite-slug">Slug</Label>
-                    <Input
-                      id="suite-slug"
-                      value={form.slug}
-                      onChange={(e) =>
-                        setForm((s) => ({ ...s, slug: e.target.value.toLowerCase() }))
-                      }
-                      disabled={createMu.isPending || updateMu.isPending}
-                      required
-                      className="font-mono text-xs"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="suite-order">Sort order</Label>
-                    <Input
-                      id="suite-order"
-                      type="number"
-                      value={form.sortOrder}
-                      onChange={(e) => setForm((s) => ({ ...s, sortOrder: e.target.value }))}
-                      disabled={createMu.isPending || updateMu.isPending}
-                    />
-                  </div>
-                </div>
                 <div className="space-y-2">
                   <Label htmlFor="suite-name">Name</Label>
                   <Input
@@ -281,6 +262,33 @@ export default function TestsSuitesPage() {
                     onChange={(e) => setForm((s) => ({ ...s, name: e.target.value }))}
                     disabled={createMu.isPending || updateMu.isPending}
                     required
+                    placeholder="e.g. PPL, CPL, ATPL"
+                  />
+                  {dialog.mode === 'create' ? (
+                    slugPreview ? (
+                      <p className="text-xs text-muted-foreground">
+                        Slug: <span className="font-mono text-foreground">{slugPreview}</span>
+                      </p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">
+                        A slug is created automatically from the name.
+                      </p>
+                    )
+                  ) : (
+                    <div className="rounded-lg border border-dashed border-border bg-muted/30 px-3 py-2">
+                      <p className="text-xs text-muted-foreground">Slug (fixed after creation)</p>
+                      <p className="font-mono text-sm">{dialog.slug}</p>
+                    </div>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="suite-order">Sort order</Label>
+                  <Input
+                    id="suite-order"
+                    type="number"
+                    value={form.sortOrder}
+                    onChange={(e) => setForm((s) => ({ ...s, sortOrder: e.target.value }))}
+                    disabled={createMu.isPending || updateMu.isPending}
                   />
                 </div>
                 <div className="space-y-2">
