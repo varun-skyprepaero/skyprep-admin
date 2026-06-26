@@ -842,7 +842,8 @@ export default function UsersPage() {
                     ))}
                   </select>
                   <p className="text-xs text-muted-foreground">
-                    Students are directed to the Classroom app; staff roles use the Admin app.
+                    Students and instructors are directed to the Classroom app; admin staff use this
+                    portal.
                   </p>
                 </div>
 

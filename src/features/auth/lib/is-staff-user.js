@@ -1,10 +1,20 @@
-/** Must match skyprep-classroom-backend `USER_ROLES.STUDENT`. */
-const STUDENT_ROLE_NAME = 'Student'
+/** Must match skyprep-classroom-backend ADMIN_PORTAL_ROLE_NAMES. */
+export const ADMIN_PORTAL_ROLE_NAMES = [
+  'Super Admin',
+  'Admin',
+  'Data Entry',
+  'Psychologist',
+]
 
 /**
  * @param {{ role?: { name?: string } | null, userRole?: { name?: string } | null } | null | undefined} user
  */
-export function isStaffUser(user) {
+export function isAdminPortalUser(user) {
   const name = user?.role?.name ?? user?.userRole?.name
-  return Boolean(name && name !== STUDENT_ROLE_NAME)
+  return Boolean(name && ADMIN_PORTAL_ROLE_NAMES.includes(name))
+}
+
+/** @deprecated Use {@link isAdminPortalUser}. */
+export function isStaffUser(user) {
+  return isAdminPortalUser(user)
 }

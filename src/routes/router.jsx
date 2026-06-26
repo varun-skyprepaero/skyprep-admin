@@ -1,25 +1,27 @@
-import { lazy } from 'react'
 import { createBrowserRouter, Navigate } from 'react-router-dom'
 import { AdminShellLayout } from '@/components/layout/admin-shell-layout'
 import { AuthLayout } from '@/components/layout/auth-layout'
 import { GuestRoute } from '@/routes/guest-route'
 import { ProtectedRoute } from '@/routes/protected-route'
+import { lazyWithRetry } from '@/lib/lazy-with-retry'
+import { RouteErrorFallback } from '@/routes/route-error-fallback'
 import { SuspensePage } from '@/routes/lazy-boundary'
 
-const DashboardPage = lazy(() => import('@/features/dashboard/DashboardPage'))
-const LoginPage = lazy(() => import('@/features/auth/pages/LoginPage'))
-const RegisterPage = lazy(() => import('@/features/auth/pages/RegisterPage'))
-const UsersPage = lazy(() => import('@/features/users/pages/UsersPage'))
-const TestsLayout = lazy(() => import('@/features/tests/TestsLayout'))
-const TestsSubjectsPage = lazy(() => import('@/features/tests/pages/SubjectsPage'))
-const TestsBooksPage = lazy(() => import('@/features/tests/pages/BooksPage'))
-const TestsQuestionsPage = lazy(() => import('@/features/tests/pages/QuestionsPage'))
-const TestsSuitesPage = lazy(() => import('@/features/tests/pages/SuitesPage'))
-const TestsPackagesPage = lazy(() => import('@/features/tests/pages/PackagesPage'))
+const DashboardPage = lazyWithRetry(() => import('@/features/dashboard/DashboardPage'))
+const LoginPage = lazyWithRetry(() => import('@/features/auth/pages/LoginPage'))
+const RegisterPage = lazyWithRetry(() => import('@/features/auth/pages/RegisterPage'))
+const UsersPage = lazyWithRetry(() => import('@/features/users/pages/UsersPage'))
+const TestsLayout = lazyWithRetry(() => import('@/features/tests/TestsLayout'))
+const TestsSubjectsPage = lazyWithRetry(() => import('@/features/tests/pages/SubjectsPage'))
+const TestsBooksPage = lazyWithRetry(() => import('@/features/tests/pages/BooksPage'))
+const TestsQuestionsPage = lazyWithRetry(() => import('@/features/tests/pages/QuestionsPage'))
+const TestsSuitesPage = lazyWithRetry(() => import('@/features/tests/pages/SuitesPage'))
+const TestsPackagesPage = lazyWithRetry(() => import('@/features/tests/pages/PackagesPage'))
 
 export const router = createBrowserRouter([
   {
     element: <GuestRoute />,
+    errorElement: <RouteErrorFallback />,
     children: [
       {
         element: <AuthLayout />,
@@ -46,6 +48,7 @@ export const router = createBrowserRouter([
   },
   {
     element: <ProtectedRoute />,
+    errorElement: <RouteErrorFallback />,
     children: [
       {
         element: <AdminShellLayout />,

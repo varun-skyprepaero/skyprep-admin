@@ -21,7 +21,7 @@ import { notifyError, notifySuccess } from '@/lib/notifications'
 import { useAuthStore } from '@/stores/auth-store'
 
 const STAFF_ACCESS_DENIED =
-  'This portal is for staff only. Students must sign in through the Classroom app.'
+  'This portal is for admin staff only. Students and instructors must sign in through the Classroom app.'
 
 export default function LoginPage() {
   const [form, setForm] = useState({ email: '', password: '' })
@@ -69,7 +69,7 @@ export default function LoginPage() {
     onError: (error) => {
       const { message, fieldErrors, errorCode } = handleApiError(error, 'Unable to sign in')
       const next = { ...fieldErrors }
-      if (errorCode === 'ADMIN_STAFF_ONLY') {
+      if (errorCode === 'ADMIN_PORTAL_ONLY' || errorCode === 'ADMIN_STAFF_ONLY') {
         next.root = STAFF_ACCESS_DENIED
       } else if (message) {
         next.root = message

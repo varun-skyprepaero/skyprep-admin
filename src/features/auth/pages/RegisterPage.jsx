@@ -200,7 +200,8 @@ export default function RegisterPage() {
         <CardHeader>
           <CardTitle>Use SkyPrep Classroom</CardTitle>
           <CardDescription>
-            This invitation is for a student account. Complete signup in the classroom app.
+            This invitation is for a student or instructor account. Complete signup in the
+            classroom app.
           </CardDescription>
         </CardHeader>
         <CardContent>
