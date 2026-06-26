@@ -16,6 +16,8 @@ import {
   registerFromInvite,
 } from '@/features/auth/api/auth-api'
 import { toAuthSession } from '@/features/auth/lib/to-auth-session'
+import { ClassroomSignupRedirect } from '@/features/auth/components/classroom-signup-redirect'
+import { isClassroomSignupInvite } from '@/features/auth/lib/is-classroom-signup-invite'
 import { SUPER_ADMIN_ROLE_NAME } from '@/features/invitations/constants'
 import { TimezoneField } from '@/features/auth/components/timezone-field'
 import { env } from '@/config/env'
@@ -116,6 +118,9 @@ export default function RegisterPage() {
 
   function handleSubmit(event) {
     event.preventDefault()
+    if (isClassroomSignupInvite(inviteMeta)) {
+      return
+    }
     const validation = validateInviteForm({
       ...form,
       email: inviteEmail,
@@ -193,28 +198,13 @@ export default function RegisterPage() {
     )
   }
 
-  if (meta?.signupApp === 'classroom') {
-    const base = env.classroomAppUrl.replace(/\/$/, '')
+  if (isClassroomSignupInvite(meta)) {
     return (
-      <Card className="border-border/60 shadow-lg">
-        <CardHeader>
-          <CardTitle>Use SkyPrep Classroom</CardTitle>
-          <CardDescription>
-            This invitation is for a student or instructor account. Complete signup in the
-            classroom app.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button type="button" asChild>
-            <a
-              href={`${base}/register?invite=${encodeURIComponent(inviteToken)}`}
-              className="inline-flex w-full items-center justify-center"
-            >
-              Continue to Classroom signup
-            </a>
-          </Button>
-        </CardContent>
-      </Card>
+      <ClassroomSignupRedirect
+        classroomAppUrl={env.classroomAppUrl}
+        inviteToken={inviteToken}
+        roleName={meta?.roleName}
+      />
     )
   }
 
