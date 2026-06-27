@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Loader2, Plus } from 'lucide-react'
+import { DeleteConfirmDialog } from '@/components/ui/delete-confirm-dialog'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -29,10 +30,12 @@ import {
   optionsForQuestionType,
   validateQuestionAnswers,
 } from '@/features/tests/lib/question-form-options'
+import { QuestionLinkMultiSelect } from '@/features/tests/components/QuestionLinkMultiSelect'
 import {
   createTestQuestion,
   deleteTestQuestion,
   fetchTestBooks,
+  fetchTestLessons,
   fetchTestQuestions,
   fetchTestSubjects,
   updateTestQuestion,
@@ -43,15 +46,18 @@ import { notifyError, notifySuccess } from '@/lib/notifications'
 const qkQ = ['tests', 'questions']
 const qkSubjects = ['tests', 'subjects']
 const qkBooks = ['tests', 'books']
+const qkLessons = ['tests', 'lessons']
 
 export default function TestsQuestionsPage() {
   const queryClient = useQueryClient()
   const [search, setSearch] = useState('')
   const [subjectFilter, setSubjectFilter] = useState('')
   const [dialog, setDialog] = useState(null)
+  const [deleteTarget, setDeleteTarget] = useState(/** @type {{ uuid: string, label: string } | null} */ (null))
   const [form, setForm] = useState({
     subjectUuid: '',
-    bookUuid: '',
+    bookUuids: [],
+    lessonUuids: [],
     type: 'SINGLE_CHOICE',
     difficulty: 'MEDIUM',
     score: '1',
@@ -63,13 +69,6 @@ export default function TestsQuestionsPage() {
   const { data: subjects = [] } = useQuery({
     queryKey: qkSubjects,
     queryFn: fetchTestSubjects,
-    enabled: true,
-  })
-
-  const booksParams = subjectFilter ? { subjectUuid: subjectFilter } : {}
-  const { data: booksForFilter = [] } = useQuery({
-    queryKey: [...qkBooks, booksParams],
-    queryFn: () => fetchTestBooks(booksParams),
     enabled: true,
   })
 
@@ -96,7 +95,8 @@ export default function TestsQuestionsPage() {
     mutationFn: () =>
       createTestQuestion({
         subjectUuid: form.subjectUuid.trim(),
-        bookUuid: form.bookUuid.trim() || null,
+        bookUuids: form.bookUuids,
+        lessonUuids: form.lessonUuids,
         type: form.type,
         difficulty: form.difficulty,
         score: form.score,
@@ -120,7 +120,8 @@ export default function TestsQuestionsPage() {
     mutationFn: () =>
       updateTestQuestion(dialog.uuid, {
         subjectUuid: form.subjectUuid.trim(),
-        bookUuid: form.bookUuid.trim() || null,
+        bookUuids: form.bookUuids,
+        lessonUuids: form.lessonUuids,
         type: form.type,
         difficulty: form.difficulty,
         score: form.score,
@@ -146,6 +147,7 @@ export default function TestsQuestionsPage() {
       notifySuccess('Question deleted')
       void queryClient.invalidateQueries({ queryKey: qkQ })
       void queryClient.invalidateQueries({ queryKey: qkSubjects })
+      setDeleteTarget(null)
     },
     onError: (err) => {
       const { message } = handleApiError(err, 'Unable to delete question')
@@ -162,10 +164,20 @@ export default function TestsQuestionsPage() {
     enabled: Boolean(dialog && form.subjectUuid),
   })
 
+  const lessonsForFormParams = form.subjectUuid
+    ? { subjectUuid: form.subjectUuid }
+    : {}
+  const { data: lessonsForForm = [] } = useQuery({
+    queryKey: [...qkLessons, 'form', lessonsForFormParams],
+    queryFn: () => fetchTestLessons(lessonsForFormParams),
+    enabled: Boolean(dialog && form.subjectUuid),
+  })
+
   function openCreate() {
     setForm({
       subjectUuid: subjectFilter || '',
-      bookUuid: '',
+      bookUuids: [],
+      lessonUuids: [],
       type: 'SINGLE_CHOICE',
       difficulty: 'MEDIUM',
       score: '1',
@@ -188,7 +200,8 @@ export default function TestsQuestionsPage() {
         : []
     setForm({
       subjectUuid: row.subject?.uuid ?? '',
-      bookUuid: row.book?.uuid ?? '',
+      bookUuids: (row.books ?? (row.book ? [row.book] : [])).map((b) => b.uuid),
+      lessonUuids: (row.lessons ?? []).map((l) => l.uuid),
       type,
       difficulty: row.difficulty,
       score: String(row.score ?? '1'),
@@ -271,6 +284,8 @@ export default function TestsQuestionsPage() {
                     <tr>
                       <th className="px-4 py-3 font-medium">Question text</th>
                       <th className="px-4 py-3 font-medium">Subject</th>
+                      <th className="px-4 py-3 font-medium">Books</th>
+                      <th className="px-4 py-3 font-medium">Lessons</th>
                       <th className="px-4 py-3 font-medium">Type</th>
                       <th className="px-4 py-3 font-medium">Difficulty</th>
                       <th className="px-4 py-3 font-medium">Score</th>
@@ -280,7 +295,7 @@ export default function TestsQuestionsPage() {
                   <tbody>
                     {filteredRows.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
+                        <td colSpan={8} className="px-4 py-8 text-center text-muted-foreground">
                           {data.length === 0
                             ? 'No questions yet.'
                             : 'No results match your search.'}
@@ -293,6 +308,14 @@ export default function TestsQuestionsPage() {
                             <span className="line-clamp-2">{row.stem}</span>
                           </td>
                           <td className="px-4 py-3">{row.subject?.name ?? '—'}</td>
+                          <td className="px-4 py-3 text-xs">
+                            {(row.books ?? (row.book ? [row.book] : []))
+                              .map((b) => b.title)
+                              .join(', ') || '—'}
+                          </td>
+                          <td className="px-4 py-3 text-xs">
+                            {(row.lessons ?? []).map((l) => l.name).join(', ') || '—'}
+                          </td>
                           <td className="px-4 py-3 text-xs">{row.type}</td>
                           <td className="px-4 py-3 text-xs">{row.difficulty}</td>
                           <td className="px-4 py-3">{row.score}</td>
@@ -308,11 +331,11 @@ export default function TestsQuestionsPage() {
                                 label: 'Delete',
                                 destructive: true,
                                 disabled: deleteMu.isPending,
-                                onClick: () => {
-                                  if (window.confirm('Delete this question?')) {
-                                    deleteMu.mutate(row.uuid)
-                                  }
-                                },
+                                onClick: () =>
+                                  setDeleteTarget({
+                                    uuid: row.uuid,
+                                    label: row.stem.slice(0, 80) || 'this question',
+                                  }),
                               },
                             ]}
                           />
@@ -345,50 +368,48 @@ export default function TestsQuestionsPage() {
             </CardHeader>
             <CardContent>
               <form className="space-y-4" onSubmit={submit}>
+                <div className="space-y-2">
+                  <Label htmlFor="q-subject">Subject</Label>
+                  <select
+                    id="q-subject"
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm"
+                    value={form.subjectUuid}
+                    onChange={(e) =>
+                      setForm((s) => ({
+                        ...s,
+                        subjectUuid: e.target.value,
+                        bookUuids: [],
+                        lessonUuids: [],
+                      }))
+                    }
+                    disabled={createMu.isPending || updateMu.isPending}
+                    required
+                  >
+                    <option value="">Select…</option>
+                    {subjects.map((s) => (
+                      <option key={s.uuid} value={s.uuid}>
+                        {s.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="q-subject">Subject</Label>
-                    <select
-                      id="q-subject"
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm"
-                      value={form.subjectUuid}
-                      onChange={(e) =>
-                        setForm((s) => ({
-                          ...s,
-                          subjectUuid: e.target.value,
-                          bookUuid: '',
-                        }))
-                      }
-                      disabled={createMu.isPending || updateMu.isPending}
-                      required
-                    >
-                      <option value="">Select…</option>
-                      {subjects.map((s) => (
-                        <option key={s.uuid} value={s.uuid}>
-                          {s.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="q-book">Book (optional)</Label>
-                    <select
-                      id="q-book"
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm"
-                      value={form.bookUuid}
-                      onChange={(e) => setForm((s) => ({ ...s, bookUuid: e.target.value }))}
-                      disabled={
-                        createMu.isPending || updateMu.isPending || !form.subjectUuid
-                      }
-                    >
-                      <option value="">None</option>
-                      {(form.subjectUuid ? booksForForm : booksForFilter).map((b) => (
-                        <option key={b.uuid} value={b.uuid}>
-                          {b.title}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                  <QuestionLinkMultiSelect
+                    label="Books (optional)"
+                    emptyLabel="No books for this subject"
+                    options={booksForForm.map((b) => ({ uuid: b.uuid, label: b.title }))}
+                    selected={form.bookUuids}
+                    disabled={createMu.isPending || updateMu.isPending || !form.subjectUuid}
+                    onChange={(bookUuids) => setForm((s) => ({ ...s, bookUuids }))}
+                  />
+                  <QuestionLinkMultiSelect
+                    label="Lessons (optional)"
+                    emptyLabel="No lessons for this subject"
+                    options={lessonsForForm.map((l) => ({ uuid: l.uuid, label: l.name }))}
+                    selected={form.lessonUuids}
+                    disabled={createMu.isPending || updateMu.isPending || !form.subjectUuid}
+                    onChange={(lessonUuids) => setForm((s) => ({ ...s, lessonUuids }))}
+                  />
                 </div>
                 <div className="grid gap-3 sm:grid-cols-3">
                   <div className="space-y-2">
@@ -483,6 +504,23 @@ export default function TestsQuestionsPage() {
           </Card>
         </div>
       ) : null}
+
+      <DeleteConfirmDialog
+        open={Boolean(deleteTarget)}
+        title="Delete question?"
+        description={
+          deleteTarget ? (
+            <>
+              Delete{' '}
+              <span className="font-medium text-foreground">{deleteTarget.label}</span>? This cannot
+              be undone.
+            </>
+          ) : null
+        }
+        loading={deleteMu.isPending}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={() => deleteTarget && deleteMu.mutate(deleteTarget.uuid)}
+      />
     </div>
   )
 }

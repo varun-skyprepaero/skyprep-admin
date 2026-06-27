@@ -71,6 +71,26 @@ export async function deleteTestBook(uuid) {
   return unwrap(res)
 }
 
+export async function fetchTestLessons(params = {}) {
+  const res = await apiClient.get('/bank/lessons', { params })
+  return unwrap(res).lessons
+}
+
+export async function createTestLesson(payload) {
+  const res = await apiClient.post('/bank/lessons', payload)
+  return unwrap(res).lesson
+}
+
+export async function updateTestLesson(uuid, payload) {
+  const res = await apiClient.patch(`/bank/lessons/${uuid}`, payload)
+  return unwrap(res).lesson
+}
+
+export async function deleteTestLesson(uuid) {
+  const res = await apiClient.delete(`/bank/lessons/${uuid}`)
+  return unwrap(res)
+}
+
 export async function fetchTestQuestions(params = {}) {
   const res = await apiClient.get('/bank/questions', { params })
   return unwrap(res).questions

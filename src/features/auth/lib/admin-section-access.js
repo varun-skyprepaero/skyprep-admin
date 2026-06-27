@@ -62,6 +62,7 @@ export function canAccessTestsSection(user, matrix) {
   const testScreens = [
     'tests.subjects',
     'tests.books',
+    'tests.lessons',
     'tests.questions',
     'tests.suites',
     'tests.packages',

@@ -21,6 +21,7 @@ export const SUPER_ADMIN_ROLE = {
 const TEST_SCREEN_IDS = [
   'tests.subjects',
   'tests.books',
+  'tests.lessons',
   'tests.questions',
   'tests.suites',
   'tests.packages',

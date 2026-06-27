@@ -14,6 +14,7 @@ const UsersPage = lazyWithRetry(() => import('@/features/users/pages/UsersPage')
 const TestsLayout = lazyWithRetry(() => import('@/features/tests/TestsLayout'))
 const TestsSubjectsPage = lazyWithRetry(() => import('@/features/tests/pages/SubjectsPage'))
 const TestsBooksPage = lazyWithRetry(() => import('@/features/tests/pages/BooksPage'))
+const TestsLessonsPage = lazyWithRetry(() => import('@/features/tests/pages/LessonsPage'))
 const TestsQuestionsPage = lazyWithRetry(() => import('@/features/tests/pages/QuestionsPage'))
 const TestsSuitesPage = lazyWithRetry(() => import('@/features/tests/pages/SuitesPage'))
 const TestsPackagesPage = lazyWithRetry(() => import('@/features/tests/pages/PackagesPage'))
@@ -115,6 +116,14 @@ export const router = createBrowserRouter([
                 element: (
                   <SuspensePage>
                     <TestsBooksPage />
+                  </SuspensePage>
+                ),
+              },
+              {
+                path: 'lessons',
+                element: (
+                  <SuspensePage>
+                    <TestsLessonsPage />
                   </SuspensePage>
                 ),
               },

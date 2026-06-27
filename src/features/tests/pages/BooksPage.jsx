@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Loader2, Plus } from 'lucide-react'
+import { DeleteConfirmDialog } from '@/components/ui/delete-confirm-dialog'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -39,6 +40,7 @@ export default function TestsBooksPage() {
   const [search, setSearch] = useState('')
   const [subjectFilter, setSubjectFilter] = useState('')
   const [dialog, setDialog] = useState(null)
+  const [deleteTarget, setDeleteTarget] = useState(/** @type {{ uuid: string, label: string } | null} */ (null))
   const [form, setForm] = useState({
     title: '',
     author: '',
@@ -121,6 +123,7 @@ export default function TestsBooksPage() {
       notifySuccess('Book deleted')
       void queryClient.invalidateQueries({ queryKey: qkBooks })
       void queryClient.invalidateQueries({ queryKey: qkSubjects })
+      setDeleteTarget(null)
     },
     onError: (err) => {
       const { message } = handleApiError(err, 'Unable to delete book')
@@ -239,11 +242,8 @@ export default function TestsBooksPage() {
                                 label: 'Delete',
                                 destructive: true,
                                 disabled: deleteMu.isPending,
-                                onClick: () => {
-                                  if (window.confirm(`Delete book “${row.title}”?`)) {
-                                    deleteMu.mutate(row.uuid)
-                                  }
-                                },
+                                onClick: () =>
+                                  setDeleteTarget({ uuid: row.uuid, label: row.title }),
                               },
                             ]}
                           />
@@ -353,6 +353,22 @@ export default function TestsBooksPage() {
           </Card>
         </div>
       ) : null}
+
+      <DeleteConfirmDialog
+        open={Boolean(deleteTarget)}
+        title="Delete book?"
+        description={
+          deleteTarget ? (
+            <>
+              Delete <span className="font-medium text-foreground">{deleteTarget.label}</span>? This
+              cannot be undone.
+            </>
+          ) : null
+        }
+        loading={deleteMu.isPending}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={() => deleteTarget && deleteMu.mutate(deleteTarget.uuid)}
+      />
     </div>
   )
 }

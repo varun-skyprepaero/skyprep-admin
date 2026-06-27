@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Loader2, Plus } from 'lucide-react'
+import { DeleteConfirmDialog } from '@/components/ui/delete-confirm-dialog'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -36,10 +37,10 @@ export default function TestsSuitesPage() {
   const queryClient = useQueryClient()
   const [search, setSearch] = useState('')
   const [dialog, setDialog] = useState(null)
+  const [deleteTarget, setDeleteTarget] = useState(/** @type {{ uuid: string, label: string } | null} */ (null))
   const [form, setForm] = useState({
     name: '',
     description: '',
-    sortOrder: '0',
   })
 
   const slugPreview = slugifyFromName(form.name)
@@ -69,7 +70,6 @@ export default function TestsSuitesPage() {
         slug: slugifyFromName(form.name),
         name: form.name.trim(),
         description: form.description.trim() || null,
-        sortOrder: Number(form.sortOrder) || 0,
       }),
     onSuccess: () => {
       notifySuccess('Suite created')
@@ -87,7 +87,6 @@ export default function TestsSuitesPage() {
       updateTestSuite(dialog.uuid, {
         name: form.name.trim(),
         description: form.description.trim() || null,
-        sortOrder: Number(form.sortOrder) || 0,
       }),
     onSuccess: () => {
       notifySuccess('Suite updated')
@@ -106,6 +105,7 @@ export default function TestsSuitesPage() {
       notifySuccess('Suite deleted')
       void queryClient.invalidateQueries({ queryKey: qk })
       void queryClient.invalidateQueries({ queryKey: ['tests', 'packages'] })
+      setDeleteTarget(null)
     },
     onError: (err) => {
       const { message } = handleApiError(err, 'Unable to delete suite')
@@ -117,7 +117,6 @@ export default function TestsSuitesPage() {
     setForm({
       name: '',
       description: '',
-      sortOrder: '0',
     })
     setDialog({ mode: 'create' })
   }
@@ -126,7 +125,6 @@ export default function TestsSuitesPage() {
     setForm({
       name: row.name,
       description: row.description ?? '',
-      sortOrder: String(row.sortOrder ?? 0),
     })
     setDialog({ mode: 'edit', uuid: row.uuid, slug: row.slug })
   }
@@ -180,7 +178,6 @@ export default function TestsSuitesPage() {
                     <tr>
                       <th className="px-4 py-3 font-medium">Name</th>
                       <th className="px-4 py-3 font-medium">Slug</th>
-                      <th className="px-4 py-3 font-medium">Order</th>
                       <th className="px-4 py-3 font-medium">Series</th>
                       <DataTableActionsHeader />
                     </tr>
@@ -188,7 +185,7 @@ export default function TestsSuitesPage() {
                   <tbody>
                     {filteredRows.length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">
+                        <td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">
                           {data.length === 0
                             ? 'No suites yet.'
                             : 'No results match your search.'}
@@ -199,7 +196,6 @@ export default function TestsSuitesPage() {
                         <tr key={row.uuid} className="border-b border-border/60 last:border-0">
                           <td className="px-4 py-3">{row.name}</td>
                           <td className="px-4 py-3 font-mono text-xs">{row.slug}</td>
-                          <td className="px-4 py-3">{row.sortOrder ?? 0}</td>
                           <td className="px-4 py-3">{row.packageCount ?? '—'}</td>
                           <DataTableRowActions
                             rowId={row.uuid}
@@ -213,11 +209,8 @@ export default function TestsSuitesPage() {
                                 label: 'Delete',
                                 destructive: true,
                                 disabled: deleteMu.isPending,
-                                onClick: () => {
-                                  if (window.confirm(`Delete suite “${row.name}”?`)) {
-                                    deleteMu.mutate(row.uuid)
-                                  }
-                                },
+                                onClick: () =>
+                                  setDeleteTarget({ uuid: row.uuid, label: row.name }),
                               },
                             ]}
                           />
@@ -282,16 +275,6 @@ export default function TestsSuitesPage() {
                   )}
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="suite-order">Sort order</Label>
-                  <Input
-                    id="suite-order"
-                    type="number"
-                    value={form.sortOrder}
-                    onChange={(e) => setForm((s) => ({ ...s, sortOrder: e.target.value }))}
-                    disabled={createMu.isPending || updateMu.isPending}
-                  />
-                </div>
-                <div className="space-y-2">
                   <Label htmlFor="suite-desc">Description</Label>
                   <textarea
                     id="suite-desc"
@@ -322,6 +305,22 @@ export default function TestsSuitesPage() {
           </Card>
         </div>
       ) : null}
+
+      <DeleteConfirmDialog
+        open={Boolean(deleteTarget)}
+        title="Delete suite?"
+        description={
+          deleteTarget ? (
+            <>
+              Delete <span className="font-medium text-foreground">{deleteTarget.label}</span>? This
+              cannot be undone.
+            </>
+          ) : null
+        }
+        loading={deleteMu.isPending}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={() => deleteTarget && deleteMu.mutate(deleteTarget.uuid)}
+      />
     </div>
   )
 }

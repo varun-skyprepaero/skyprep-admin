@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Loader2, Save, Trash2 } from 'lucide-react'
 import { Navigate } from 'react-router-dom'
+import { DeleteConfirmDialog } from '@/components/ui/delete-confirm-dialog'
 import { Button } from '@/components/ui/button'
 import { isSuperAdmin } from '@/features/auth/lib/admin-section-access'
 import { AddRoleForm } from '@/features/roles-permissions/components/add-role-form'
@@ -32,6 +33,7 @@ export default function RolesPermissionsPage() {
     /** @type {Record<string, Record<string, Record<string, boolean>>>} */ ({}),
   )
   const [isDirty, setIsDirty] = useState(false)
+  const [deleteRoleConfirmOpen, setDeleteRoleConfirmOpen] = useState(false)
 
   const permissionsQuery = useQuery({
     queryKey: rolePermissionsQueryKey,
@@ -70,6 +72,7 @@ export default function RolesPermissionsPage() {
       notifySuccess(`Role "${result.name}" deleted`)
       setSelectedRoleUuid(null)
       setIsDirty(false)
+      setDeleteRoleConfirmOpen(false)
       await queryClient.invalidateQueries({ queryKey: rolePermissionsQueryKey })
       await queryClient.invalidateQueries({ queryKey: ['admin', 'invitable-roles'] })
     },
@@ -163,9 +166,7 @@ export default function RolesPermissionsPage() {
 
   function handleDeleteRole() {
     if (!canDeleteSelected || !activeRoleUuid) return
-    const roleName = selectedRole?.name ?? 'this role'
-    if (!window.confirm(`Delete "${roleName}"? This cannot be undone.`)) return
-    deleteRoleMutation.mutate(activeRoleUuid)
+    setDeleteRoleConfirmOpen(true)
   }
 
   return (
@@ -269,6 +270,23 @@ export default function RolesPermissionsPage() {
       ) : (
         <RolePermissionsPanel permissions={panelPermissions} onToggle={handleToggle} />
       )}
+
+      <DeleteConfirmDialog
+        open={deleteRoleConfirmOpen}
+        title="Delete role?"
+        description={
+          <>
+            Delete{' '}
+            <span className="font-medium text-foreground">
+              {selectedRole?.name ?? 'this role'}
+            </span>
+            ? This cannot be undone.
+          </>
+        }
+        loading={deleteRoleMutation.isPending}
+        onClose={() => setDeleteRoleConfirmOpen(false)}
+        onConfirm={() => activeRoleUuid && deleteRoleMutation.mutate(activeRoleUuid)}
+      />
     </div>
   )
 }
