@@ -7,6 +7,7 @@ import {
   hasValidAccessToken,
   shouldRefreshAccessToken,
 } from '@/lib/auth/token-utils'
+import { permissionsStore } from '@/stores/permissions-store'
 
 export const useAuthStore = create(
   persist(
@@ -19,6 +20,7 @@ export const useAuthStore = create(
       tokenType: 'Bearer',
       sessionRefreshIntervalSeconds: null,
       lastSessionRefreshAt: null,
+      impersonation: null,
       isAuthenticated: false,
       _hasHydrated: false,
       isBootstrapping: true,
@@ -34,6 +36,7 @@ export const useAuthStore = create(
           tokenType: session.tokenType ?? 'Bearer',
           sessionRefreshIntervalSeconds: session.sessionRefreshIntervalSeconds ?? null,
           lastSessionRefreshAt: session.lastSessionRefreshAt ?? new Date().toISOString(),
+          impersonation: session.impersonation ?? null,
           isAuthenticated: Boolean(session.accessToken && user && isStaffUser(user)),
         })
       },
@@ -47,6 +50,7 @@ export const useAuthStore = create(
       },
 
       logout: () => {
+        permissionsStore.clear()
         set({
           user: null,
           accessToken: null,
@@ -56,6 +60,7 @@ export const useAuthStore = create(
           tokenType: 'Bearer',
           sessionRefreshIntervalSeconds: null,
           lastSessionRefreshAt: null,
+          impersonation: null,
           isAuthenticated: false,
           isBootstrapping: false,
         })
@@ -105,6 +110,7 @@ export const useAuthStore = create(
         tokenType: state.tokenType,
         sessionRefreshIntervalSeconds: state.sessionRefreshIntervalSeconds,
         lastSessionRefreshAt: state.lastSessionRefreshAt,
+        impersonation: state.impersonation,
         isAuthenticated: state.isAuthenticated,
       }),
       onRehydrateStorage: () => (state) => {

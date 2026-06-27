@@ -1,7 +1,9 @@
 import { useEffect } from 'react'
 import { getUserProfile } from '@/features/auth/api/auth-api'
+import { fetchMyPermissions } from '@/features/roles-permissions/api/permissions-api'
 import { isStaffUser } from '@/features/auth/lib/is-staff-user'
 import { useAuthStore } from '@/stores/auth-store'
+import { permissionsStore } from '@/stores/permissions-store'
 
 export function AuthBootstrap() {
   const accessToken = useAuthStore((s) => s.accessToken)
@@ -16,6 +18,7 @@ export function AuthBootstrap() {
 
     const uuid = user?.uuid
     if (!accessToken || !uuid) {
+      permissionsStore.clear()
       setBootstrapping(false)
       return
     }
@@ -29,13 +32,21 @@ export function AuthBootstrap() {
         if (cancelled) return
 
         if (!isStaffUser(profile)) {
+          permissionsStore.clear()
           logout()
           return
         }
 
         setUser(profile)
+
+        const permissions = await fetchMyPermissions()
+        if (cancelled) return
+        permissionsStore.setPermissions(permissions)
       } catch {
-        if (!cancelled) logout()
+        if (!cancelled) {
+          permissionsStore.clear()
+          logout()
+        }
       } finally {
         if (!cancelled) setBootstrapping(false)
       }

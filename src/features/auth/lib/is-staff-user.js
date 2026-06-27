@@ -1,4 +1,4 @@
-/** Must match skyprep-classroom-backend ADMIN_PORTAL_ROLE_NAMES. */
+/** Must match skyprep-classroom-backend ADMIN_PORTAL_ROLE_NAMES (legacy fallback). */
 export const ADMIN_PORTAL_ROLE_NAMES = [
   'Super Admin',
   'Admin',
@@ -7,11 +7,15 @@ export const ADMIN_PORTAL_ROLE_NAMES = [
 ]
 
 /**
- * @param {{ role?: { name?: string } | null, userRole?: { name?: string } | null } | null | undefined} user
+ * @param {{ role?: { name?: string, portalType?: string } | null, userRole?: { name?: string, portalType?: string } | null } | null | undefined} user
  */
 export function isAdminPortalUser(user) {
-  const name = user?.role?.name ?? user?.userRole?.name
-  return Boolean(name && ADMIN_PORTAL_ROLE_NAMES.includes(name))
+  const role = user?.role ?? user?.userRole ?? null
+  if (!role) return false
+  if (role.portalType) {
+    return role.portalType === 'ADMIN_PORTAL'
+  }
+  return Boolean(role.name && ADMIN_PORTAL_ROLE_NAMES.includes(role.name))
 }
 
 /** @deprecated Use {@link isAdminPortalUser}. */

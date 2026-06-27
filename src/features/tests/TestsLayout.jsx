@@ -2,6 +2,7 @@ import { NavLink, Navigate, Outlet } from 'react-router-dom'
 import { Loader2 } from 'lucide-react'
 import { canAccessTestsSection } from '@/features/auth/lib/admin-section-access'
 import { useAuthStore } from '@/stores/auth-store'
+import { usePermissionsStore } from '@/stores/permissions-store'
 import { cn } from '@/lib/utils'
 
 const tabs = [
@@ -14,6 +15,7 @@ const tabs = [
 
 export default function TestsLayout() {
   const user = useAuthStore((s) => s.user)
+  const matrix = usePermissionsStore((s) => s.matrix)
   const hasHydrated = useAuthStore((s) => s._hasHydrated)
   const isBootstrapping = useAuthStore((s) => s.isBootstrapping)
 
@@ -25,7 +27,7 @@ export default function TestsLayout() {
     )
   }
 
-  if (!canAccessTestsSection(user)) {
+  if (!canAccessTestsSection(user, matrix)) {
     return <Navigate to="/" replace />
   }
 

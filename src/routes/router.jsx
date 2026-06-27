@@ -17,8 +17,20 @@ const TestsBooksPage = lazyWithRetry(() => import('@/features/tests/pages/BooksP
 const TestsQuestionsPage = lazyWithRetry(() => import('@/features/tests/pages/QuestionsPage'))
 const TestsSuitesPage = lazyWithRetry(() => import('@/features/tests/pages/SuitesPage'))
 const TestsPackagesPage = lazyWithRetry(() => import('@/features/tests/pages/PackagesPage'))
+const RolesPermissionsPage = lazyWithRetry(() =>
+  import('@/features/roles-permissions/pages/RolesPermissionsPage'),
+)
+const StaffLoginPage = lazyWithRetry(() => import('@/features/auth/pages/StaffLoginPage'))
 
 export const router = createBrowserRouter([
+  {
+    path: '/staff-login',
+    element: (
+      <SuspensePage>
+        <StaffLoginPage />
+      </SuspensePage>
+    ),
+  },
   {
     element: <GuestRoute />,
     errorElement: <RouteErrorFallback />,
@@ -70,6 +82,14 @@ export const router = createBrowserRouter([
             element: (
               <SuspensePage>
                 <UsersPage />
+              </SuspensePage>
+            ),
+          },
+          {
+            path: '/roles-permissions',
+            element: (
+              <SuspensePage>
+                <RolesPermissionsPage />
               </SuspensePage>
             ),
           },

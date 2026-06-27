@@ -4,15 +4,17 @@ import {
   ClipboardList,
   FileText,
   HelpCircle,
+  KeyRound,
   LayoutDashboard,
   UserCog,
   Users,
 } from 'lucide-react'
 
 import {
-  TESTS_SECTION_ROLE_NAMES,
-  USERS_SECTION_ROLE_NAMES,
-} from '@/features/invitations/constants'
+  canAccessRolesPermissionsSection,
+  canAccessTestsSection,
+  canAccessUsersSection,
+} from '@/features/auth/lib/admin-section-access'
 
 export const adminNav = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
@@ -20,13 +22,19 @@ export const adminNav = [
     name: 'Users',
     href: '/users',
     icon: Users,
-    roles: USERS_SECTION_ROLE_NAMES,
+    canAccess: canAccessUsersSection,
   },
   {
     name: 'Tests',
     href: '/tests',
     icon: ClipboardList,
-    roles: TESTS_SECTION_ROLE_NAMES,
+    canAccess: canAccessTestsSection,
+  },
+  {
+    name: 'Roles & permissions',
+    href: '/roles-permissions',
+    icon: KeyRound,
+    canAccess: canAccessRolesPermissionsSection,
   },
   { name: 'Calendar', href: '/calendar', icon: Calendar, disabled: true },
   { name: 'Focus One', href: '/focus-one', icon: Users, disabled: true },
@@ -40,6 +48,7 @@ export function getAdminNavTitle(pathname) {
   if (pathname === '/') return 'Dashboard'
   if (pathname.startsWith('/users')) return 'Users'
   if (pathname.startsWith('/tests')) return 'Tests'
+  if (pathname.startsWith('/roles-permissions')) return 'Roles & permissions'
   const item = adminNav.find(
     (nav) => !nav.disabled && nav.href !== '/' && pathname.startsWith(nav.href),
   )

@@ -2,8 +2,6 @@ import {
   DATA_ENTRY_ROLE_NAME,
   INVITABLE_ROLE_OPTIONS,
   SUPER_ADMIN_ROLE_NAME,
-  TESTS_SECTION_ROLE_NAMES,
-  USERS_SECTION_ROLE_NAMES,
 } from '@/features/invitations/constants'
 
 /**
@@ -14,22 +12,23 @@ function roleName(user) {
 }
 
 /**
+ * @param {import('@/features/roles-permissions/api/permissions-api.types').PermissionMatrix | null | undefined} matrix
+ * @param {string} screenId
+ * @param {import('@/features/roles-permissions/constants').PermissionAction} action
+ */
+export function hasPermission(matrix, screenId, action, user) {
+  if (user && isSuperAdmin(user)) return true
+  if (!matrix) return false
+  return Boolean(matrix[screenId]?.[action])
+}
+
+/**
  * @param {{ role?: { name?: string } | null, userRole?: { name?: string } | null } | null | undefined} user
  * @param {readonly string[]} allowedRoles
  */
 export function hasAdminPortalRole(user, allowedRoles) {
   const name = roleName(user)
   return Boolean(name && allowedRoles.includes(name))
-}
-
-/** @param {Parameters<typeof hasAdminPortalRole>[0]} user */
-export function canAccessUsersSection(user) {
-  return hasAdminPortalRole(user, USERS_SECTION_ROLE_NAMES)
-}
-
-/** @param {Parameters<typeof hasAdminPortalRole>[0]} user */
-export function canAccessTestsSection(user) {
-  return hasAdminPortalRole(user, TESTS_SECTION_ROLE_NAMES)
 }
 
 /** @param {Parameters<typeof hasAdminPortalRole>[0]} user */
@@ -43,21 +42,75 @@ export function isDataEntryUser(user) {
 }
 
 /**
- * Data Entry must not see or manage other Data Entry accounts in the Users directory.
+ * @param {Parameters<typeof hasAdminPortalRole>[0]} user
+ * @param {import('@/features/roles-permissions/api/permissions-api.types').PermissionMatrix | null | undefined} matrix
+ */
+export function canAccessUsersSection(user, matrix) {
+  if (isSuperAdmin(user)) return true
+  return (
+    hasPermission(matrix, 'users.directory', 'view') ||
+    hasPermission(matrix, 'users.invitations', 'view')
+  )
+}
+
+/**
+ * @param {Parameters<typeof hasAdminPortalRole>[0]} user
+ * @param {import('@/features/roles-permissions/api/permissions-api.types').PermissionMatrix | null | undefined} matrix
+ */
+export function canAccessTestsSection(user, matrix) {
+  if (isSuperAdmin(user)) return true
+  const testScreens = [
+    'tests.subjects',
+    'tests.books',
+    'tests.questions',
+    'tests.suites',
+    'tests.packages',
+  ]
+  return testScreens.some((screenId) => hasPermission(matrix, screenId, 'view'))
+}
+
+/**
+ * @param {Parameters<typeof hasAdminPortalRole>[0]} user
+ * @param {import('@/features/roles-permissions/api/permissions-api.types').PermissionMatrix | null | undefined} matrix
+ */
+export function canAccessRolesPermissionsSection(user, matrix) {
+  void matrix
+  return isSuperAdmin(user)
+}
+
+/**
  * @param {Parameters<typeof hasAdminPortalRole>[0]} viewer
  * @param {string | null | undefined} targetRoleName
+ * @param {import('@/features/roles-permissions/api/permissions-api.types').PermissionMatrix | null | undefined} matrix
  */
-export function canViewUserInDirectory(viewer, targetRoleName) {
-  if (isDataEntryUser(viewer) && targetRoleName === DATA_ENTRY_ROLE_NAME) {
-    return false
+export function canViewUserInDirectory(viewer, targetRoleName, matrix) {
+  if (isSuperAdmin(viewer)) return true
+  if (targetRoleName === DATA_ENTRY_ROLE_NAME) {
+    return hasPermission(matrix, 'users.data_entry_peers', 'view')
   }
   return true
 }
 
-/** @param {Parameters<typeof hasAdminPortalRole>[0]} user */
-export function invitableRoleOptionsForUser(user) {
-  if (isDataEntryUser(user)) {
-    return INVITABLE_ROLE_OPTIONS.filter((opt) => opt.value !== DATA_ENTRY_ROLE_NAME)
+/**
+ * @param {Parameters<typeof hasAdminPortalRole>[0]} user
+ * @param {import('@/features/roles-permissions/api/permissions-api.types').PermissionMatrix | null | undefined} matrix
+ */
+export function canImpersonateClassroomUser(user, matrix) {
+  return hasPermission(matrix, 'users.impersonation', 'impersonate', user)
+}
+
+/**
+ * @param {Parameters<typeof hasAdminPortalRole>[0]} user
+ * @param {import('@/features/roles-permissions/api/permissions-api.types').PermissionMatrix | null | undefined} matrix
+ */
+export function invitableRoleOptionsForUser(
+  user,
+  matrix,
+  roleOptions = INVITABLE_ROLE_OPTIONS,
+) {
+  if (isSuperAdmin(user)) return roleOptions
+  if (!hasPermission(matrix, 'users.data_entry_peers', 'view')) {
+    return roleOptions.filter((opt) => opt.value !== DATA_ENTRY_ROLE_NAME)
   }
-  return INVITABLE_ROLE_OPTIONS
+  return roleOptions
 }
