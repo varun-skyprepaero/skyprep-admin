@@ -29,23 +29,23 @@ import {
 import { INVITABLE_ROLE_OPTIONS, SUPER_ADMIN_ROLE_NAME } from '@/features/invitations/constants'
 import {
   canAccessUsersSection,
+  canImpersonateClassroomUser,
   canViewUserInDirectory,
   invitableRoleOptionsForUser,
-  isSuperAdmin,
 } from '@/features/auth/lib/admin-section-access'
+import { fetchInvitableRoles } from '@/features/roles-permissions/api/permissions-api'
 import { ClassroomImpersonateDialog } from '@/features/users/components/ClassroomImpersonateDialog'
 import { adminUpdateUser, fetchUsers } from '@/features/users/api/users-api'
 import { handleApiError } from '@/lib/http/api-error'
 import { notifyError, notifySuccess } from '@/lib/notifications'
 import { useAuthStore } from '@/stores/auth-store'
+import { usePermissionsStore } from '@/stores/permissions-store'
 import { cn } from '@/lib/utils'
 import { Loader2, LogIn, UserPlus, X } from 'lucide-react'
 
-const STUDENT_ROLE_NAME = 'Student'
-
-
 const usersQueryKey = ['admin', 'users', USER_ENDPOINTS.list]
 const invitationsQueryKey = ['admin', 'invitations', 'pending']
+const invitableRolesQueryKey = ['admin', 'invitable-roles']
 
 function formatShortDate(value) {
   if (!value) return '—'
@@ -182,16 +182,21 @@ function rowMatchesFilters(row, f) {
   return true
 }
 
-const ROLE_FILTER_OPTIONS = [
-  { value: 'all', label: 'All roles' },
-  { value: SUPER_ADMIN_ROLE_NAME, label: 'Super Admin' },
-  ...INVITABLE_ROLE_OPTIONS.map((o) => ({ value: o.value, label: o.label })),
-]
 
-function roleFilterOptionsForUser(user) {
-  return ROLE_FILTER_OPTIONS.filter(
-    (opt) => opt.value === 'all' || canViewUserInDirectory(user, opt.value),
-  )
+function roleFilterOptionsForUser(user, matrix, apiRoleNames) {
+  const roleNames =
+    apiRoleNames.length > 0
+      ? apiRoleNames
+      : INVITABLE_ROLE_OPTIONS.map((opt) => opt.value)
+
+  return [
+    { value: 'all', label: 'All roles' },
+    { value: SUPER_ADMIN_ROLE_NAME, label: 'Super Admin' },
+    ...roleNames
+      .filter((name) => name !== SUPER_ADMIN_ROLE_NAME)
+      .filter((name) => canViewUserInDirectory(user, name, matrix))
+      .map((name) => ({ value: name, label: name })),
+  ]
 }
 
 const TYPE_FILTER_OPTIONS = [
@@ -250,6 +255,7 @@ function SignupSourceCell({ row }) {
 export default function UsersPage() {
   const queryClient = useQueryClient()
   const user = useAuthStore((s) => s.user)
+  const matrix = usePermissionsStore((s) => s.matrix)
   const hasHydrated = useAuthStore((s) => s._hasHydrated)
   const isBootstrapping = useAuthStore((s) => s.isBootstrapping)
 
@@ -282,24 +288,50 @@ export default function UsersPage() {
   const usersQuery = useQuery({
     queryKey: usersQueryKey,
     queryFn: fetchUsers,
-    enabled: canAccessUsersSection(user),
+    enabled: canAccessUsersSection(user, matrix),
   })
 
   const invitationsQuery = useQuery({
     queryKey: invitationsQueryKey,
     queryFn: fetchPendingInvitations,
-    enabled: canAccessUsersSection(user),
+    enabled: canAccessUsersSection(user, matrix),
   })
 
-  const inviteRoleOptions = useMemo(() => invitableRoleOptionsForUser(user), [user])
-  const roleFilterOptions = useMemo(() => roleFilterOptionsForUser(user), [user])
+  const invitableRolesQuery = useQuery({
+    queryKey: invitableRolesQueryKey,
+    queryFn: async () => {
+      const data = await fetchInvitableRoles()
+      return data.roles ?? []
+    },
+    enabled: canAccessUsersSection(user, matrix),
+  })
+
+  const apiRoleNames = useMemo(
+    () => (invitableRolesQuery.data ?? []).map((role) => role.name),
+    [invitableRolesQuery.data],
+  )
+
+  const inviteRoleOptions = useMemo(() => {
+    const fromApi =
+      invitableRolesQuery.data?.map((role) => ({
+        value: role.name,
+        label: role.name,
+      })) ?? []
+    const options = fromApi.length > 0 ? fromApi : INVITABLE_ROLE_OPTIONS
+    return invitableRoleOptionsForUser(user, matrix, options)
+  }, [invitableRolesQuery.data, user, matrix])
+
+  const roleFilterOptions = useMemo(
+    () => roleFilterOptionsForUser(user, matrix, apiRoleNames),
+    [user, matrix, apiRoleNames],
+  )
 
   const rows = useMemo(
     () =>
       buildTableRows(usersQuery.data ?? [], invitationsQuery.data ?? []).filter((row) =>
-        canViewUserInDirectory(user, row.roleName),
+        canViewUserInDirectory(user, row.roleName, matrix),
       ),
-    [usersQuery.data, invitationsQuery.data, user],
+    [usersQuery.data, invitationsQuery.data, user, matrix],
   )
 
   const filterState = useMemo(
@@ -381,9 +413,9 @@ export default function UsersPage() {
     },
   })
 
-  function openClassroomAsUser(row) {
+  function openImpersonateUser(row) {
     if (row.kind !== 'user') return
-    const name = [row.firstName, row.lastName].filter(Boolean).join(' ') || row.email || 'Student'
+    const name = [row.firstName, row.lastName].filter(Boolean).join(' ') || row.email || 'User'
     setClassroomImpersonateTarget({
       uuid: row.uuid,
       email: row.email ?? '',
@@ -478,11 +510,11 @@ export default function UsersPage() {
     )
   }
 
-  if (!canAccessUsersSection(user)) {
+  if (!canAccessUsersSection(user, matrix)) {
     return <Navigate to="/" replace />
   }
 
-  const showClassroomImpersonate = isSuperAdmin(user)
+  const canImpersonateUsers = canImpersonateClassroomUser(user, matrix)
 
   return (
     <div className="space-y-8">
@@ -700,18 +732,19 @@ export default function UsersPage() {
                               adminUpdateMutation.isPending
                             }
                             leading={
-                              showClassroomImpersonate &&
+                              canImpersonateUsers &&
                               row.kind === 'user' &&
-                              row.roleName === STUDENT_ROLE_NAME &&
-                              row.isActive ? (
+                              row.isActive &&
+                              row.roleName !== SUPER_ADMIN_ROLE_NAME &&
+                              row.uuid !== user?.uuid ? (
                                 <Button
                                   type="button"
                                   variant="outline"
                                   size="icon"
                                   className="size-8 shrink-0"
-                                  title="Open Classroom as this student"
-                                  aria-label={`Open Classroom as ${displayName || row.email}`}
-                                  onClick={() => openClassroomAsUser(row)}
+                                  title="Open as this user"
+                                  aria-label={`Open as ${displayName || row.email}`}
+                                  onClick={() => openImpersonateUser(row)}
                                 >
                                   <LogIn className="size-4" aria-hidden />
                                 </Button>

@@ -1,8 +1,5 @@
 /**
- * Map classroom-backend login/refresh payload to persisted session.
- * @see skyprep-classroom-backend/auth-api-doc.md
- *
- * @param {{ user: object, tokens: object }} data
+ * @param {{ user: object, tokens: object, impersonation?: object | null }} data
  */
 export function toAuthSession(data) {
   return {
@@ -14,5 +11,6 @@ export function toAuthSession(data) {
     tokenType: data.tokens.tokenType ?? 'Bearer',
     sessionRefreshIntervalSeconds: data.tokens.sessionRefreshIntervalSeconds,
     lastSessionRefreshAt: data.tokens.sessionRefreshedAt,
+    impersonation: data.impersonation ?? null,
   }
 }

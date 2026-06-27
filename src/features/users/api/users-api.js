@@ -29,16 +29,17 @@ export async function adminUpdateUser(userUuid, payload) {
 
 /**
  * @param {string} userUuid
- * @returns {Promise<{ classroomUrl: string, targetEmail?: string }>}
+ * @returns {Promise<{ signInUrl: string, classroomUrl: string, targetApp?: 'classroom' | 'admin', targetEmail?: string }>}
  */
 export async function createClassroomImpersonateLink(userUuid) {
   try {
     const { data } = await apiClient.post(USER_ENDPOINTS.classroomImpersonate(userUuid))
     const payload = data?.data
-    if (!payload?.classroomUrl) {
-      throw new Error('Could not create Classroom sign-in link')
+    const signInUrl = payload?.signInUrl ?? payload?.classroomUrl
+    if (!signInUrl) {
+      throw new Error('Could not create sign-in link')
     }
-    return payload
+    return { ...payload, signInUrl, classroomUrl: signInUrl }
   } catch (error) {
     throw toApiClientError(error)
   }

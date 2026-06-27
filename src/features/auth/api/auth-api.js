@@ -105,3 +105,15 @@ export async function registerFromInvite(payload) {
     throw toApiClientError(error)
   }
 }
+
+/**
+ * @param {string} token
+ */
+export async function exchangeImpersonate(token) {
+  try {
+    const { data } = await apiClient.post(AUTH_ENDPOINTS.impersonate, { token })
+    return data
+  } catch (error) {
+    throw toApiClientError(error)
+  }
+}

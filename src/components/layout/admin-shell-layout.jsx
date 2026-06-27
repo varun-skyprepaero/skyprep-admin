@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Outlet } from 'react-router-dom'
 import { AdminSidebar } from '@/components/layout/admin-sidebar'
 import { AdminTopbar } from '@/components/layout/admin-topbar'
+import { ImpersonationBanner } from '@/components/layout/impersonation-banner'
 import { cn } from '@/lib/utils'
 
 const SIDEBAR_COLLAPSED_KEY = 'skyprep-admin-sidebar-collapsed'
@@ -54,6 +55,7 @@ export function AdminShellLayout() {
           onToggleCollapse={() => setSidebarCollapsed((v) => !v)}
           sidebarCollapsed={sidebarCollapsed}
         />
+        <ImpersonationBanner />
         <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
           <div className="mx-auto w-full max-w-[88rem]">
             <Outlet />

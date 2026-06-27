@@ -28,6 +28,7 @@ function isPublicAuthRoute(url = '') {
     url.includes('/auth/login') ||
     url.includes('/auth/register') ||
     url.includes('/auth/register/invite') ||
+    url.includes('/auth/impersonate') ||
     url.includes('/auth/verify-email') ||
     url.includes('/auth/resend-verification') ||
     url.includes('/invitations/preview')

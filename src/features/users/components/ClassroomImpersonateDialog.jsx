@@ -14,13 +14,17 @@ import { notifyError, notifySuccess } from '@/lib/notifications'
  */
 export function ClassroomImpersonateDialog({ target, onClose }) {
   const open = Boolean(target)
-  const [classroomUrl, setClassroomUrl] = useState(/** @type {string | null} */ (null))
+  const [signInUrl, setSignInUrl] = useState(/** @type {string | null} */ (null))
+  const [targetApp, setTargetApp] = useState(/** @type {'classroom' | 'admin' | null} */ (null))
   const [error, setError] = useState(/** @type {string | null} */ (null))
   const [loading, setLoading] = useState(false)
 
+  const appLabel = targetApp === 'admin' ? 'Admin' : 'Classroom'
+
   useEffect(() => {
     if (!target) {
-      setClassroomUrl(null)
+      setSignInUrl(null)
+      setTargetApp(null)
       setError(null)
       setLoading(false)
       return
@@ -29,17 +33,19 @@ export function ClassroomImpersonateDialog({ target, onClose }) {
     let cancelled = false
     setLoading(true)
     setError(null)
-    setClassroomUrl(null)
+    setSignInUrl(null)
+    setTargetApp(null)
 
     createClassroomImpersonateLink(target.uuid)
       .then((payload) => {
         if (cancelled) return
-        setClassroomUrl(payload.classroomUrl)
+        setSignInUrl(payload.signInUrl)
+        setTargetApp(payload.targetApp === 'admin' ? 'admin' : 'classroom')
       })
       .catch((err) => {
         if (cancelled) return
-        const { message } = handleApiError(err, 'Could not create Classroom link')
-        setError(message || 'Could not create Classroom link')
+        const { message } = handleApiError(err, 'Could not create sign-in link')
+        setError(message || 'Could not create sign-in link')
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -56,9 +62,9 @@ export function ClassroomImpersonateDialog({ target, onClose }) {
   }
 
   async function copyLink() {
-    if (!classroomUrl) return
+    if (!signInUrl) return
     try {
-      await navigator.clipboard.writeText(classroomUrl)
+      await navigator.clipboard.writeText(signInUrl)
       notifySuccess('Link copied to clipboard')
     } catch {
       notifyError('Could not copy link')
@@ -85,7 +91,7 @@ export function ClassroomImpersonateDialog({ target, onClose }) {
         <CardHeader>
           <div className="flex items-start justify-between gap-4">
             <div className="space-y-1">
-              <CardTitle id="classroom-impersonate-title">Open Classroom</CardTitle>
+              <CardTitle id="classroom-impersonate-title">Open {appLabel}</CardTitle>
               <CardDescription>
                 Sign in as <span className="font-medium text-foreground">{target.name}</span>
                 {target.email ? (
@@ -125,7 +131,7 @@ export function ClassroomImpersonateDialog({ target, onClose }) {
               {error}
             </p>
           ) : null}
-          {classroomUrl && !loading ? (
+          {signInUrl && !loading ? (
             <p className="text-sm text-muted-foreground">
               Click Open in new tab below. This works even when the browser blocks popups. You can
               also copy the link and paste it into a new tab.
@@ -140,14 +146,14 @@ export function ClassroomImpersonateDialog({ target, onClose }) {
             type="button"
             variant="outline"
             onClick={() => void copyLink()}
-            disabled={loading || !classroomUrl}
+            disabled={loading || !signInUrl}
           >
             Copy link
           </Button>
-          {classroomUrl ? (
+          {signInUrl ? (
             <Button type="button" className="gap-2" asChild>
               <a
-                href={classroomUrl}
+                href={signInUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={onClose}

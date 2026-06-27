@@ -4,6 +4,7 @@ export const AUTH_ENDPOINTS = {
   refresh: '/auth/refresh',
   logout: '/auth/logout',
   session: '/auth/session',
+  impersonate: '/auth/impersonate',
 }
 
 export const INVITATION_ENDPOINTS = {

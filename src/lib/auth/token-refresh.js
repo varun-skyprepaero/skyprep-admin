@@ -44,6 +44,7 @@ export async function refreshAccessToken() {
         const session = toAuthSession({
           user: payload.user ?? state.user,
           tokens: payload.tokens,
+          impersonation: state.impersonation,
         })
 
         authStore.setSession(session)
