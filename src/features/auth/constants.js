@@ -1,6 +1,9 @@
 export const AUTH_ENDPOINTS = {
   login: '/auth/login',
   registerInvite: '/auth/register/invite',
+  forgotPassword: '/auth/forgot-password',
+  forgotPasswordVerify: '/auth/forgot-password/verify',
+  forgotPasswordReset: '/auth/forgot-password/reset',
   refresh: '/auth/refresh',
   logout: '/auth/logout',
   session: '/auth/session',

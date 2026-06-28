@@ -48,10 +48,24 @@ export function isDataEntryUser(user) {
 export function canAccessUsersSection(user, matrix) {
   if (isSuperAdmin(user)) return true
   return (
-    hasPermission(matrix, 'users.directory', 'view') ||
-    hasPermission(matrix, 'users.invitations', 'view')
+    hasPermission(matrix, 'users.directory', 'view', user) ||
+    hasPermission(matrix, 'users.invitations', 'view', user)
   )
 }
+
+const TEST_SECTION_SCREENS = [
+  'tests.subjects',
+  'tests.books',
+  'tests.lessons',
+  'tests.questions',
+  'tests.suites',
+  'tests.packages',
+]
+
+const SUBSCRIPTION_SECTION_SCREENS = [
+  'tests.subscription_plans',
+  'tests.subscribers',
+]
 
 /**
  * @param {Parameters<typeof hasAdminPortalRole>[0]} user
@@ -59,15 +73,16 @@ export function canAccessUsersSection(user, matrix) {
  */
 export function canAccessTestsSection(user, matrix) {
   if (isSuperAdmin(user)) return true
-  const testScreens = [
-    'tests.subjects',
-    'tests.books',
-    'tests.lessons',
-    'tests.questions',
-    'tests.suites',
-    'tests.packages',
-  ]
-  return testScreens.some((screenId) => hasPermission(matrix, screenId, 'view'))
+  return TEST_SECTION_SCREENS.some((screenId) => hasPermission(matrix, screenId, 'view', user))
+}
+
+/**
+ * @param {Parameters<typeof hasAdminPortalRole>[0]} user
+ * @param {import('@/features/roles-permissions/api/permissions-api.types').PermissionMatrix | null | undefined} matrix
+ */
+export function canAccessSubscriptionSection(user, matrix) {
+  if (isSuperAdmin(user)) return true
+  return SUBSCRIPTION_SECTION_SCREENS.some((screenId) => hasPermission(matrix, screenId, 'view', user))
 }
 
 /**
@@ -75,8 +90,7 @@ export function canAccessTestsSection(user, matrix) {
  * @param {import('@/features/roles-permissions/api/permissions-api.types').PermissionMatrix | null | undefined} matrix
  */
 export function canAccessRolesPermissionsSection(user, matrix) {
-  void matrix
-  return isSuperAdmin(user)
+  return hasPermission(matrix, 'roles.permissions', 'view', user)
 }
 
 /**
@@ -87,7 +101,7 @@ export function canAccessRolesPermissionsSection(user, matrix) {
 export function canViewUserInDirectory(viewer, targetRoleName, matrix) {
   if (isSuperAdmin(viewer)) return true
   if (targetRoleName === DATA_ENTRY_ROLE_NAME) {
-    return hasPermission(matrix, 'users.data_entry_peers', 'view')
+    return hasPermission(matrix, 'users.data_entry_peers', 'view', viewer)
   }
   return true
 }
@@ -110,8 +124,18 @@ export function invitableRoleOptionsForUser(
   roleOptions = INVITABLE_ROLE_OPTIONS,
 ) {
   if (isSuperAdmin(user)) return roleOptions
-  if (!hasPermission(matrix, 'users.data_entry_peers', 'view')) {
+  if (!hasPermission(matrix, 'users.data_entry_peers', 'view', user)) {
     return roleOptions.filter((opt) => opt.value !== DATA_ENTRY_ROLE_NAME)
   }
   return roleOptions
+}
+
+/** @param {string} screenId */
+export function canViewTestScreen(user, matrix, screenId) {
+  return hasPermission(matrix, screenId, 'view', user)
+}
+
+/** @param {string} screenId */
+export function canViewSubscriptionScreen(user, matrix, screenId) {
+  return hasPermission(matrix, screenId, 'view', user)
 }

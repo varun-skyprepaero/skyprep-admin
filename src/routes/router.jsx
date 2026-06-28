@@ -9,6 +9,7 @@ import { SuspensePage } from '@/routes/lazy-boundary'
 
 const DashboardPage = lazyWithRetry(() => import('@/features/dashboard/DashboardPage'))
 const LoginPage = lazyWithRetry(() => import('@/features/auth/pages/LoginPage'))
+const ForgotPasswordPage = lazyWithRetry(() => import('@/features/auth/pages/ForgotPasswordPage'))
 const RegisterPage = lazyWithRetry(() => import('@/features/auth/pages/RegisterPage'))
 const UsersPage = lazyWithRetry(() => import('@/features/users/pages/UsersPage'))
 const TestsLayout = lazyWithRetry(() => import('@/features/tests/TestsLayout'))
@@ -18,6 +19,16 @@ const TestsLessonsPage = lazyWithRetry(() => import('@/features/tests/pages/Less
 const TestsQuestionsPage = lazyWithRetry(() => import('@/features/tests/pages/QuestionsPage'))
 const TestsSuitesPage = lazyWithRetry(() => import('@/features/tests/pages/SuitesPage'))
 const TestsPackagesPage = lazyWithRetry(() => import('@/features/tests/pages/PackagesPage'))
+const SubscriptionLayout = lazyWithRetry(() =>
+  import('@/features/subscription/SubscriptionLayout'),
+)
+const SubscriptionPlansPage = lazyWithRetry(() =>
+  import('@/features/tests/pages/SubscriptionPlansPage'),
+)
+const SubscribersPage = lazyWithRetry(() => import('@/features/tests/pages/SubscribersPage'))
+const SubscriptionIndexRedirect = lazyWithRetry(() =>
+  import('@/features/subscription/SubscriptionIndexRedirect'),
+)
 const RolesPermissionsPage = lazyWithRetry(() =>
   import('@/features/roles-permissions/pages/RolesPermissionsPage'),
 )
@@ -44,6 +55,14 @@ export const router = createBrowserRouter([
             element: (
               <SuspensePage>
                 <LoginPage />
+              </SuspensePage>
+            ),
+          },
+          {
+            path: '/forgot-password',
+            element: (
+              <SuspensePage>
+                <ForgotPasswordPage />
               </SuspensePage>
             ),
           },
@@ -148,6 +167,35 @@ export const router = createBrowserRouter([
                 element: (
                   <SuspensePage>
                     <TestsPackagesPage />
+                  </SuspensePage>
+                ),
+              },
+            ],
+          },
+          {
+            path: '/subscription',
+            element: (
+              <SuspensePage>
+                <SubscriptionLayout />
+              </SuspensePage>
+            ),
+            children: [
+              { index: true, element: <SubscriptionIndexRedirect /> },
+              { path: 'products', element: <Navigate to="/subscription/plans" replace /> },
+              { path: 'one-time', element: <Navigate to="/subscription/plans" replace /> },
+              {
+                path: 'plans',
+                element: (
+                  <SuspensePage>
+                    <SubscriptionPlansPage />
+                  </SuspensePage>
+                ),
+              },
+              {
+                path: 'subscribers',
+                element: (
+                  <SuspensePage>
+                    <SubscribersPage />
                   </SuspensePage>
                 ),
               },

@@ -1,9 +1,6 @@
-export const QUESTION_TYPE_OPTIONS = [
-  { value: 'SINGLE_CHOICE', label: 'Single choice' },
-  { value: 'MULTIPLE_CHOICE', label: 'Multiple choice' },
-  { value: 'TRUE_FALSE', label: 'True / false' },
-  { value: 'SHORT_ANSWER', label: 'Short answer' },
-  { value: 'ESSAY', label: 'Essay' },
+export const CURRENCY_OPTIONS = [
+  { value: 'INR', label: 'INR' },
+  { value: 'USD', label: 'USD' },
 ]
 
 export const DIFFICULTY_OPTIONS = [
@@ -12,7 +9,10 @@ export const DIFFICULTY_OPTIONS = [
   { value: 'HARD', label: 'Hard' },
 ]
 
-export const CURRENCY_OPTIONS = [
-  { value: 'INR', label: 'INR' },
-  { value: 'USD', label: 'USD' },
+export const QUESTION_TYPE_OPTIONS = [
+  { value: 'SINGLE_CHOICE', label: 'Single choice' },
+  { value: 'MULTIPLE_CHOICE', label: 'Multiple choice' },
+  { value: 'TRUE_FALSE', label: 'True / false' },
+  { value: 'SHORT_ANSWER', label: 'Short answer' },
+  { value: 'ESSAY', label: 'Essay' },
 ]

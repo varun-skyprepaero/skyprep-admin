@@ -4,7 +4,9 @@ import { Loader2, Save, Trash2 } from 'lucide-react'
 import { Navigate } from 'react-router-dom'
 import { DeleteConfirmDialog } from '@/components/ui/delete-confirm-dialog'
 import { Button } from '@/components/ui/button'
-import { isSuperAdmin } from '@/features/auth/lib/admin-section-access'
+import {
+  hasPermission,
+} from '@/features/auth/lib/admin-section-access'
 import { AddRoleForm } from '@/features/roles-permissions/components/add-role-form'
 import { RolePermissionsPanel } from '@/features/roles-permissions/components/role-permissions-panel'
 import {
@@ -17,6 +19,7 @@ import { createFullAccessPermissions } from '@/features/roles-permissions/consta
 import { handleApiError } from '@/lib/http/api-error'
 import { notifyError, notifySuccess } from '@/lib/notifications'
 import { useAuthStore } from '@/stores/auth-store'
+import { usePermissionsStore } from '@/stores/permissions-store'
 import { cn } from '@/lib/utils'
 
 const rolePermissionsQueryKey = ['admin', 'role-permissions']
@@ -24,8 +27,14 @@ const rolePermissionsQueryKey = ['admin', 'role-permissions']
 export default function RolesPermissionsPage() {
   const queryClient = useQueryClient()
   const user = useAuthStore((s) => s.user)
+  const matrix = usePermissionsStore((s) => s.matrix)
   const hasHydrated = useAuthStore((s) => s._hasHydrated)
   const isBootstrapping = useAuthStore((s) => s.isBootstrapping)
+
+  const canView = hasPermission(matrix, 'roles.permissions', 'view', user)
+  const canEdit = hasPermission(matrix, 'roles.permissions', 'edit', user)
+  const canCreate = hasPermission(matrix, 'roles.permissions', 'create', user)
+  const canDelete = hasPermission(matrix, 'roles.permissions', 'delete', user)
 
   const [selectedRoleUuid, setSelectedRoleUuid] = useState(null)
   const [showAddRole, setShowAddRole] = useState(false)
@@ -38,7 +47,7 @@ export default function RolesPermissionsPage() {
   const permissionsQuery = useQuery({
     queryKey: rolePermissionsQueryKey,
     queryFn: fetchRolePermissions,
-    enabled: isSuperAdmin(user),
+    enabled: canView,
   })
 
   const saveMutation = useMutation({
@@ -109,7 +118,7 @@ export default function RolesPermissionsPage() {
     )
   }
 
-  if (!isSuperAdmin(user)) {
+  if (!canView) {
     return <Navigate to="/" replace />
   }
 
@@ -130,9 +139,9 @@ export default function RolesPermissionsPage() {
   }
 
   const activeRoleUuid = selectedRole?.uuid ?? null
-  const isReadOnly = !selectedRole?.configurable
+  const isReadOnly = !selectedRole?.configurable || !canEdit
   const canDeleteSelected =
-    selectedRole?.configurable && !selectedRole?.isSystem && activeRoleUuid
+    canDelete && selectedRole?.configurable && !selectedRole?.isSystem && activeRoleUuid
 
   const serverPermissions = selectedRole?.permissions ?? {}
   const panelPermissions = isDirty
@@ -140,7 +149,7 @@ export default function RolesPermissionsPage() {
     : serverPermissions
 
   function handleToggle(screenId, action, enabled) {
-    if (!activeRoleUuid || isReadOnly) return
+    if (!activeRoleUuid || isReadOnly || !canEdit) return
 
     const base = draftPermissions[activeRoleUuid] ?? serverPermissions
     setDraftPermissions((prev) => ({
@@ -195,19 +204,21 @@ export default function RolesPermissionsPage() {
               Delete role
             </Button>
           ) : null}
-          <Button
-            type="button"
-            size="sm"
-            onClick={handleSave}
-            disabled={!isDirty || isReadOnly || saveMutation.isPending}
-          >
-            {saveMutation.isPending ? (
-              <Loader2 className="size-4 animate-spin" aria-hidden />
-            ) : (
-              <Save className="size-4" aria-hidden />
-            )}
-            Save
-          </Button>
+          {canEdit ? (
+            <Button
+              type="button"
+              size="sm"
+              onClick={handleSave}
+              disabled={!isDirty || isReadOnly || saveMutation.isPending}
+            >
+              {saveMutation.isPending ? (
+                <Loader2 className="size-4 animate-spin" aria-hidden />
+              ) : (
+                <Save className="size-4" aria-hidden />
+              )}
+              Save
+            </Button>
+          ) : null}
         </div>
       </div>
 
@@ -233,17 +244,19 @@ export default function RolesPermissionsPage() {
             </button>
           )
         })}
-        <button
-          type="button"
-          onClick={() => setShowAddRole((v) => !v)}
-          className="rounded-full border border-dashed px-4 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:border-primary hover:text-primary"
-        >
-          + Add role
-        </button>
+        {canCreate ? (
+          <button
+            type="button"
+            onClick={() => setShowAddRole((v) => !v)}
+            className="rounded-full border border-dashed px-4 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:border-primary hover:text-primary"
+          >
+            + Add role
+          </button>
+        ) : null}
       </div>
 
       <AddRoleForm
-        open={showAddRole}
+        open={showAddRole && canCreate}
         onOpenChange={setShowAddRole}
         onSubmit={(payload) => createRoleMutation.mutate(payload)}
         isPending={createRoleMutation.isPending}
@@ -268,7 +281,11 @@ export default function RolesPermissionsPage() {
           />
         </>
       ) : (
-        <RolePermissionsPanel permissions={panelPermissions} onToggle={handleToggle} />
+        <RolePermissionsPanel
+          readOnly={!canEdit}
+          permissions={panelPermissions}
+          onToggle={handleToggle}
+        />
       )}
 
       <DeleteConfirmDialog

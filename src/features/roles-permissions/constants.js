@@ -18,17 +18,6 @@ export const SUPER_ADMIN_ROLE = {
 
 /** @typedef {{ id: string, label: string, description?: string, screens: PermissionScreen[] }} PermissionSection */
 
-const TEST_SCREEN_IDS = [
-  'tests.subjects',
-  'tests.books',
-  'tests.lessons',
-  'tests.questions',
-  'tests.suites',
-  'tests.packages',
-]
-
-const TEST_ACTIONS = ['view', 'create', 'edit', 'delete']
-
 /** @type {PermissionSection[]} */
 export const ADMIN_PERMISSION_SECTIONS = [
   {
@@ -57,11 +46,37 @@ export const ADMIN_PERMISSION_SECTIONS = [
   {
     id: 'tests',
     label: 'Tests',
-    screens: TEST_SCREEN_IDS.map((id) => ({
-      id,
-      label: id.replace('tests.', '').replace(/^./, (c) => c.toUpperCase()),
-      actions: [...TEST_ACTIONS],
-    })),
+    screens: [
+      { id: 'tests.subjects', label: 'Subjects', actions: ['view', 'create', 'edit', 'delete'] },
+      { id: 'tests.books', label: 'Books', actions: ['view', 'create', 'edit', 'delete'] },
+      { id: 'tests.lessons', label: 'Lessons', actions: ['view', 'create', 'edit', 'delete'] },
+      { id: 'tests.questions', label: 'Questions', actions: ['view', 'create', 'edit', 'delete'] },
+      { id: 'tests.suites', label: 'Suites', actions: ['view', 'create', 'edit', 'delete'] },
+      { id: 'tests.packages', label: 'Test series', actions: ['view', 'create', 'edit', 'delete'] },
+    ],
+  },
+  {
+    id: 'subscription',
+    label: 'Manage test series',
+    screens: [
+      {
+        id: 'tests.subscription_plans',
+        label: 'Subscription plans',
+        actions: ['view', 'create', 'edit', 'delete'],
+      },
+      { id: 'tests.subscribers', label: 'Subscribers', actions: ['view', 'edit'] },
+    ],
+  },
+  {
+    id: 'access_control',
+    label: 'Access control',
+    screens: [
+      {
+        id: 'roles.permissions',
+        label: 'Roles & permissions',
+        actions: ['view', 'edit', 'create', 'delete'],
+      },
+    ],
   },
   {
     id: 'upcoming',

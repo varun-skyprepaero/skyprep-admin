@@ -116,6 +116,11 @@ export async function fetchTestPackages() {
   return unwrap(res).packages
 }
 
+export async function fetchTestPackageQuestionPoolCount(payload) {
+  const res = await apiClient.post('/bank/packages/question-pool-count', payload)
+  return unwrap(res)
+}
+
 export async function createTestPackage(payload) {
   const res = await apiClient.post('/bank/packages', payload)
   return unwrap(res).package
@@ -129,4 +134,52 @@ export async function updateTestPackage(uuid, payload) {
 export async function deleteTestPackage(uuid) {
   const res = await apiClient.delete(`/bank/packages/${uuid}`)
   return unwrap(res)
+}
+
+export async function fetchSubscriptionPlans() {
+  const res = await apiClient.get('/subscriptions/admin/subscription-plans')
+  return unwrap(res).plans
+}
+
+export async function createSubscriptionPlan(payload) {
+  const res = await apiClient.post('/subscriptions/admin/subscription-plans', payload)
+  return unwrap(res).plan
+}
+
+export async function createSubscriptionPlanPair(payload) {
+  const res = await apiClient.post('/subscriptions/admin/subscription-plans/pair', payload)
+  return unwrap(res).plans
+}
+
+export async function updateSubscriptionPlan(uuid, payload) {
+  const res = await apiClient.patch(`/subscriptions/admin/subscription-plans/${uuid}`, payload)
+  return unwrap(res).plan
+}
+
+export async function resyncSubscriptionPlan(uuid) {
+  const res = await apiClient.post(`/subscriptions/admin/subscription-plans/${uuid}/resync`)
+  return unwrap(res).plan
+}
+
+export async function deleteSubscriptionPlan(uuid) {
+  const res = await apiClient.delete(`/subscriptions/admin/subscription-plans/${uuid}`)
+  return unwrap(res)
+}
+
+export async function fetchTestSeriesSubscribers(params = {}) {
+  const res = await apiClient.get('/subscriptions/admin/test-series-subscribers', { params })
+  return unwrap(res)
+}
+
+export async function cancelTestSeriesSubscriber(uuid, payload = {}) {
+  const res = await apiClient.post(
+    `/subscriptions/admin/test-series-subscribers/${uuid}/cancel`,
+    payload,
+  )
+  return unwrap(res).subscription
+}
+
+export async function grantTestSeriesSubscription(payload) {
+  const res = await apiClient.post('/subscriptions/admin/test-series-subscribers/grant', payload)
+  return unwrap(res).subscription
 }

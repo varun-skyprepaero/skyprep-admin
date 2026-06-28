@@ -17,26 +17,20 @@ import {
 } from '@/features/auth/api/auth-api'
 import { toAuthSession } from '@/features/auth/lib/to-auth-session'
 import { ClassroomSignupRedirect } from '@/features/auth/components/classroom-signup-redirect'
+import { RegistrationCountryFields } from '@/features/auth/components/registration-country-fields'
 import { isClassroomSignupInvite } from '@/features/auth/lib/is-classroom-signup-invite'
 import { SUPER_ADMIN_ROLE_NAME } from '@/features/invitations/constants'
 import { TimezoneField } from '@/features/auth/components/timezone-field'
+import { getPasswordValidationError } from '@/features/auth/lib/password-policy'
 import { env } from '@/config/env'
 import { getBrowserTimezone, isValidIANATimezone, normalizeTimezone } from '@/lib/datetime/timezone-utils'
-import { COUNTRY_CALLING_CODES } from '@/lib/phone/country-calling-codes'
+import { resolveRegistrationContact, countrySelectionFromIso } from '@/lib/phone/country-selection'
 import { handleApiError } from '@/lib/http/api-error'
 import { notifySuccess } from '@/lib/notifications'
 import { useAuthStore } from '@/stores/auth-store'
-import { cn } from '@/lib/utils'
 import { Eye, EyeOff, Loader2 } from 'lucide-react'
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-const PASS_ERR = 'Password must be at least 8 characters'
-
-const countryCallingCodeSelectClass = cn(
-  'flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm',
-  'transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
-  'disabled:cursor-not-allowed disabled:opacity-50',
-)
 
 function validateInviteForm(form) {
   const errors = {}
@@ -44,20 +38,27 @@ function validateInviteForm(form) {
   if (!form.email.trim()) errors.email = 'Email is required'
   else if (!EMAIL_RE.test(form.email.trim())) errors.email = 'Enter a valid email address'
   if (!form.password) errors.password = 'Password is required'
-  else if (form.password.length < 8) errors.password = PASS_ERR
+  else {
+    const passwordError = getPasswordValidationError(form.password)
+    if (passwordError && passwordError !== 'Password is required') {
+      errors.password = passwordError
+    }
+  }
   const tz = normalizeTimezone(form.timezone)
   if (!tz) errors.timezone = 'Timezone is required'
   else if (!isValidIANATimezone(tz)) errors.timezone = 'Use a valid IANA timezone (e.g. Asia/Kolkata)'
-  const phone = form.phoneNumber?.trim() ?? ''
-  const countryIso = form.countryIso?.trim() ?? ''
-  if (!countryIso) errors.countryCode = 'Country code is required'
-  if (!phone) errors.phoneNumber = 'Phone number is required'
+
+  const contact = resolveRegistrationContact(form)
+  if (!contact.country) errors.country = 'Country is required'
+  if (!contact.countryCode) errors.phoneCountryCode = 'Phone country code is required'
+  if (!contact.phoneNumber) errors.phoneNumber = 'Phone number is required'
   else {
-    const digits = phone.replace(/\D/g, '')
+    const digits = contact.phoneNumber.replace(/\D/g, '')
     if (digits.length < 6 || digits.length > 15) {
       errors.phoneNumber = 'Enter a valid phone number (6–15 digits)'
     }
   }
+
   return errors
 }
 
@@ -72,6 +73,8 @@ export default function RegisterPage() {
     password: '',
     timezone: getBrowserTimezone(),
     countryIso: '',
+    country: '',
+    phoneCountryIso: '',
     phoneNumber: '',
   }))
   const [errors, setErrors] = useState({})
@@ -116,6 +119,32 @@ export default function RegisterPage() {
     },
   })
 
+  function applyCountrySelection(iso, selection) {
+    setForm((prev) => ({
+      ...prev,
+      countryIso: iso,
+      country: selection?.country ?? '',
+    }))
+    setErrors((prev) => {
+      const next = { ...prev }
+      delete next.country
+      return next
+    })
+  }
+
+  function applyPhoneCountrySelection(iso) {
+    setForm((prev) => ({
+      ...prev,
+      phoneCountryIso: iso,
+    }))
+    setErrors((prev) => {
+      const next = { ...prev }
+      delete next.phoneCountryCode
+      delete next.countryCode
+      return next
+    })
+  }
+
   function handleSubmit(event) {
     event.preventDefault()
     if (isClassroomSignupInvite(inviteMeta)) {
@@ -131,17 +160,16 @@ export default function RegisterPage() {
       return
     }
     setErrors({})
-    const dialCode = form.countryIso.trim()
-      ? COUNTRY_CALLING_CODES.find((c) => c.iso2 === form.countryIso.trim())?.dialCode
-      : undefined
+    const contact = resolveRegistrationContact(form)
     mutation.mutate({
       inviteToken,
       firstName: form.firstName.trim(),
       lastName: form.lastName.trim() || undefined,
       password: form.password,
       timezone: normalizeTimezone(form.timezone) ?? '',
-      countryCode: dialCode?.trim() || undefined,
-      phoneNumber: form.phoneNumber.trim(),
+      countryCode: contact.countryCode,
+      phoneNumber: contact.phoneNumber,
+      country: contact.country,
     })
   }
 
@@ -267,51 +295,22 @@ export default function RegisterPage() {
             />
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="countryCode">Country code</Label>
-              <select
-                id="countryCode"
-                className={countryCallingCodeSelectClass}
-                autoComplete="tel-country-code"
-                value={form.countryIso}
-                onChange={(e) => setForm((prev) => ({ ...prev, countryIso: e.target.value }))}
-                disabled={mutation.isPending}
-                aria-invalid={Boolean(errors.countryCode)}
-                aria-required
-              >
-                <option value="">Select country code</option>
-                {COUNTRY_CALLING_CODES.map((c) => (
-                  <option key={`${c.iso2}-${c.dialCode}`} value={c.iso2}>
-                    {c.country} ({c.dialCode})
-                  </option>
-                ))}
-              </select>
-              {errors.countryCode ? (
-                <p className="text-sm text-destructive">{errors.countryCode}</p>
-              ) : (
-                <p className="text-xs text-muted-foreground">Required with your phone number.</p>
-              )}
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="phoneNumber">Phone number</Label>
-              <Input
-                id="phoneNumber"
-                type="tel"
-                autoComplete="tel-national"
-                value={form.phoneNumber}
-                onChange={(e) => setForm((prev) => ({ ...prev, phoneNumber: e.target.value }))}
-                disabled={mutation.isPending}
-                aria-invalid={Boolean(errors.phoneNumber)}
-                aria-required
-              />
-              {errors.phoneNumber ? (
-                <p className="text-sm text-destructive">{errors.phoneNumber}</p>
-              ) : (
-                <p className="text-xs text-muted-foreground">National number only; pick country code on the left.</p>
-              )}
-            </div>
-          </div>
+          <RegistrationCountryFields
+            countryIso={form.countryIso}
+            phoneCountryIso={form.phoneCountryIso}
+            phoneNumber={form.phoneNumber}
+            onCountryIsoChange={applyCountrySelection}
+            onPhoneCountryIsoChange={applyPhoneCountrySelection}
+            onPhoneNumberChange={(phoneNumber) =>
+              setForm((prev) => ({ ...prev, phoneNumber }))
+            }
+            errors={{
+              country: errors.country,
+              phoneCountryCode: errors.phoneCountryCode || errors.countryCode,
+              phoneNumber: errors.phoneNumber,
+            }}
+            disabled={mutation.isPending}
+          />
 
           <TimezoneField
             value={form.timezone}

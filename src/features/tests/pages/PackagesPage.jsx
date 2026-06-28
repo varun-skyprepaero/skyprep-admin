@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Loader2, Plus } from 'lucide-react'
+import { HelpCircle, Loader2, Plus } from 'lucide-react'
 import { DeleteConfirmDialog } from '@/components/ui/delete-confirm-dialog'
 import { PackageSeriesFormDialog } from '@/features/tests/pages/PackageSeriesFormDialog'
+import { TestSeriesStructureGuide } from '@/features/tests/pages/TestSeriesStructureGuide'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -24,6 +25,7 @@ import {
   createTestPackage,
   deleteTestPackage,
   fetchTestBooks,
+  fetchTestPackageQuestionPoolCount,
   fetchTestPackages,
   fetchTestSuites,
   fetchTestSubjects,
@@ -41,22 +43,21 @@ export default function TestsPackagesPage() {
   const queryClient = useQueryClient()
   const [search, setSearch] = useState('')
   const [dialog, setDialog] = useState(null)
+  const [guideOpen, setGuideOpen] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState(/** @type {{ uuid: string, label: string } | null} */ (null))
   const [form, setForm] = useState({
     slug: '',
     name: '',
     description: '',
-    billingSku: '',
-    priceAmount: '',
-    currency: 'INR',
     isPublished: true,
-    isOpenForPurchase: true,
+    isDemo: false,
     subjectUuids: [],
     difficultyFilter: [],
     questionTypeFilter: [],
     bookUuids: [],
     suiteUuid: '',
     timeLimitMinutes: '',
+    questionCount: '',
   })
 
   const { data: subjects = [] } = useQuery({
@@ -86,6 +87,35 @@ export default function TestsPackagesPage() {
     enabled: Boolean(dialog && form.subjectUuids.length > 0),
   })
 
+  const poolScopeKey = [
+    form.subjectUuids.join(','),
+    form.bookUuids.join(','),
+    form.difficultyFilter.join(','),
+    form.questionTypeFilter.join(','),
+  ].join('|')
+
+  const { data: poolData, isFetching: poolLoading } = useQuery({
+    queryKey: ['tests', 'packages', 'pool-count', poolScopeKey],
+    queryFn: () =>
+      fetchTestPackageQuestionPoolCount({
+        subjectUuids: form.subjectUuids,
+        bookUuids: form.bookUuids,
+        difficultyFilter: form.difficultyFilter,
+        questionTypeFilter: form.questionTypeFilter,
+      }),
+    enabled: Boolean(dialog && form.subjectUuids.length > 0),
+  })
+
+  const availableQuestionCount =
+    typeof poolData?.availableCount === 'number' ? poolData.availableCount : null
+  const requestedQuestionCount = form.questionCount.trim() ? Number(form.questionCount) : null
+  const questionCountTooHigh =
+    requestedQuestionCount != null &&
+    Number.isInteger(requestedQuestionCount) &&
+    requestedQuestionCount > 0 &&
+    availableQuestionCount != null &&
+    requestedQuestionCount > availableQuestionCount
+
   const filteredRows = useMemo(() => {
     const q = search.trim().toLowerCase()
     if (!q) return data
@@ -93,7 +123,6 @@ export default function TestsPackagesPage() {
       (p) =>
         p.name.toLowerCase().includes(q) ||
         p.slug.toLowerCase().includes(q) ||
-        (p.billingSku ?? '').toLowerCase().includes(q) ||
         (p.suite?.name ?? '').toLowerCase().includes(q) ||
         (p.suite?.slug ?? '').toLowerCase().includes(q),
     )
@@ -107,10 +136,8 @@ export default function TestsPackagesPage() {
         slug: slugifyFromName(form.name),
         name: form.name.trim(),
         description: form.description.trim() || null,
-        priceAmount: form.priceAmount,
-        currency: form.currency.trim() || 'INR',
         isPublished: form.isPublished,
-        isOpenForPurchase: form.isOpenForPurchase,
+        isDemo: form.isDemo,
         subjectUuids: form.subjectUuids,
         difficultyFilter: form.difficultyFilter,
         questionTypeFilter: form.questionTypeFilter,
@@ -119,6 +146,7 @@ export default function TestsPackagesPage() {
         timeLimitMinutes: form.timeLimitMinutes.trim()
           ? Number(form.timeLimitMinutes)
           : null,
+        questionCount: form.questionCount.trim() ? Number(form.questionCount) : null,
       }),
     onSuccess: () => {
       notifySuccess('Test series created')
@@ -136,10 +164,8 @@ export default function TestsPackagesPage() {
       updateTestPackage(dialog.uuid, {
         name: form.name.trim(),
         description: form.description.trim() || null,
-        priceAmount: form.priceAmount,
-        currency: form.currency.trim() || 'INR',
         isPublished: form.isPublished,
-        isOpenForPurchase: form.isOpenForPurchase,
+        isDemo: form.isDemo,
         subjectUuids: form.subjectUuids,
         difficultyFilter: form.difficultyFilter,
         questionTypeFilter: form.questionTypeFilter,
@@ -148,6 +174,7 @@ export default function TestsPackagesPage() {
         timeLimitMinutes: form.timeLimitMinutes.trim()
           ? Number(form.timeLimitMinutes)
           : null,
+        questionCount: form.questionCount.trim() ? Number(form.questionCount) : null,
       }),
     onSuccess: () => {
       notifySuccess('Test series updated')
@@ -214,17 +241,15 @@ export default function TestsPackagesPage() {
       slug: '',
       name: '',
       description: '',
-      billingSku: '',
-      priceAmount: '',
-      currency: 'INR',
       isPublished: true,
-      isOpenForPurchase: true,
+      isDemo: false,
       subjectUuids: [],
       difficultyFilter: [],
       questionTypeFilter: [],
       bookUuids: [],
       suiteUuid: '',
       timeLimitMinutes: '',
+      questionCount: '',
     })
     setDialog({ mode: 'create' })
   }
@@ -234,11 +259,8 @@ export default function TestsPackagesPage() {
       slug: row.slug,
       name: row.name,
       description: row.description ?? '',
-      billingSku: row.billingSku,
-      priceAmount: row.price ?? '',
-      currency: row.currency === 'USD' ? 'USD' : 'INR',
       isPublished: Boolean(row.isPublished),
-      isOpenForPurchase: row.isOpenForPurchase !== false,
+      isDemo: Boolean(row.isDemo),
       subjectUuids: (row.subjects ?? []).map((s) => s.uuid),
       difficultyFilter: row.difficultyFilter ?? [],
       questionTypeFilter: row.questionTypeFilter ?? [],
@@ -248,12 +270,22 @@ export default function TestsPackagesPage() {
         row.timeLimitMinutes != null && row.timeLimitMinutes > 0
           ? String(row.timeLimitMinutes)
           : '',
+      questionCount:
+        row.questionCount != null && row.questionCount > 0 ? String(row.questionCount) : '',
     })
     setDialog({ mode: 'edit', uuid: row.uuid })
   }
 
   function submit(e) {
     e.preventDefault()
+    if (questionCountTooHigh) {
+      notifyError(
+        availableQuestionCount === 0
+          ? 'No questions match the selected scope. Add questions or broaden filters before setting a limit.'
+          : `Only ${availableQuestionCount} question${availableQuestionCount === 1 ? '' : 's'} match this scope. Lower the limit or add more questions.`,
+      )
+      return
+    }
     if (dialog?.mode === 'create') {
       if (!slugifyFromName(form.name)) {
         notifyError('Enter a name with at least one letter or number.')
@@ -269,12 +301,26 @@ export default function TestsPackagesPage() {
     <div className="space-y-4">
       <Card>
         <CardHeader className="pb-4">
-          <CardTitle>Test series</CardTitle>
-          <CardDescription>
-            Pricing for the student catalog. Internal billing SKUs are generated when you create a
-            test series. Optionally assign a suite (PPL, CPL, ATPL, …) for catalog grouping.
-            Scope each series with subjects, optional difficulty / question type, and optional books.
-          </CardDescription>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="space-y-1.5">
+              <CardTitle>Test series</CardTitle>
+              <CardDescription>
+                Configure test series in the student catalog. Mark series as free demos for students
+                without a subscription, or leave them subscription-only. Optionally assign a suite
+                (PPL, CPL, ATPL, …) and scope questions by subjects, difficulty, type, and books.
+              </CardDescription>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="shrink-0"
+              onClick={() => setGuideOpen(true)}
+            >
+              <HelpCircle className="size-4" aria-hidden />
+              How it works
+            </Button>
+          </div>
         </CardHeader>
         <DataTable>
           <DataTableToolbar
@@ -298,17 +344,17 @@ export default function TestsPackagesPage() {
               <p className="p-6 text-sm text-destructive">{error?.message ?? 'Unable to load'}</p>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[980px] text-left text-sm">
+                <table className="w-full min-w-[760px] text-left text-sm">
                   <thead className="border-b bg-muted/40 text-xs uppercase text-muted-foreground">
                     <tr>
                       <th className="px-4 py-3 font-medium">Name</th>
                       <th className="px-4 py-3 font-medium">Suite</th>
                       <th className="px-4 py-3 font-medium">Slug</th>
-                      <th className="px-4 py-3 font-medium">SKU</th>
-                      <th className="px-4 py-3 font-medium">Price</th>
+                      <th className="px-4 py-3 font-medium">Questions</th>
                       <th className="px-4 py-3 font-medium">Time limit</th>
                       <th className="px-4 py-3 font-medium">Subjects</th>
-                      <th className="px-4 py-3 font-medium">Purchases</th>
+                      <th className="px-4 py-3 font-medium">Published</th>
+                      <th className="px-4 py-3 font-medium">Demo</th>
                       <DataTableActionsHeader />
                     </tr>
                   </thead>
@@ -329,9 +375,10 @@ export default function TestsPackagesPage() {
                             {row.suite ? `${row.suite.name} (${row.suite.slug})` : '—'}
                           </td>
                           <td className="px-4 py-3 font-mono text-xs">{row.slug}</td>
-                          <td className="px-4 py-3 font-mono text-xs">{row.billingSku}</td>
-                          <td className="px-4 py-3">
-                            {row.price} {row.currency}
+                          <td className="px-4 py-3 text-xs tabular-nums">
+                            {row.questionCount != null && row.questionCount > 0
+                              ? row.questionCount
+                              : 'All'}
                           </td>
                           <td className="px-4 py-3 text-xs">
                             {row.timeLimitMinutes != null && row.timeLimitMinutes > 0
@@ -342,7 +389,10 @@ export default function TestsPackagesPage() {
                             {(row.subjects ?? []).map((s) => s.name).join(', ') || '—'}
                           </td>
                           <td className="px-4 py-3 text-xs">
-                            {row.isOpenForPurchase !== false ? 'Open' : 'Closed'}
+                            {row.isPublished ? 'Yes' : 'No'}
+                          </td>
+                          <td className="px-4 py-3 text-xs">
+                            {row.isDemo ? 'Yes' : 'No'}
                           </td>
                           <DataTableRowActions
                             rowId={row.uuid}
@@ -379,6 +429,9 @@ export default function TestsPackagesPage() {
           form={form}
           setForm={setForm}
           busy={createMu.isPending || updateMu.isPending}
+          availableQuestionCount={availableQuestionCount}
+          poolLoading={poolLoading}
+          questionCountTooHigh={questionCountTooHigh}
           onClose={() => setDialog(null)}
           onSubmit={submit}
           subjects={subjects}
@@ -406,6 +459,8 @@ export default function TestsPackagesPage() {
         onClose={() => setDeleteTarget(null)}
         onConfirm={() => deleteTarget && deleteMu.mutate(deleteTarget.uuid)}
       />
+
+      <TestSeriesStructureGuide open={guideOpen} onClose={() => setGuideOpen(false)} />
     </div>
   )
 }

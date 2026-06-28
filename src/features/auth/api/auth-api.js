@@ -93,6 +93,7 @@ export async function getInvitePreview(token) {
  *   timezone: string,
  *   countryCode?: string,
  *   phoneNumber?: string,
+ *   country?: string,
  * }} payload
  */
 export async function registerFromInvite(payload) {
@@ -112,6 +113,61 @@ export async function registerFromInvite(payload) {
 export async function exchangeImpersonate(token) {
   try {
     const { data } = await apiClient.post(AUTH_ENDPOINTS.impersonate, { token })
+    return data
+  } catch (error) {
+    throw toApiClientError(error)
+  }
+}
+
+/**
+ * @param {{ email: string }} payload
+ */
+export async function requestPasswordReset(payload) {
+  try {
+    const { data } = await apiClient.post(
+      AUTH_ENDPOINTS.forgotPassword,
+      { email: payload.email.trim().toLowerCase() },
+      { skipAuthRefresh: true },
+    )
+    return data
+  } catch (error) {
+    throw toApiClientError(error)
+  }
+}
+
+/**
+ * @param {{ email: string, code: string }} payload
+ */
+export async function verifyPasswordResetCode(payload) {
+  try {
+    const { data } = await apiClient.post(
+      AUTH_ENDPOINTS.forgotPasswordVerify,
+      {
+        email: payload.email.trim().toLowerCase(),
+        code: payload.code.trim(),
+      },
+      { skipAuthRefresh: true },
+    )
+    return data
+  } catch (error) {
+    throw toApiClientError(error)
+  }
+}
+
+/**
+ * @param {{ email: string, code: string, password: string }} payload
+ */
+export async function resetPasswordWithCode(payload) {
+  try {
+    const { data } = await apiClient.post(
+      AUTH_ENDPOINTS.forgotPasswordReset,
+      {
+        email: payload.email.trim().toLowerCase(),
+        code: payload.code.trim(),
+        password: payload.password,
+      },
+      { skipAuthRefresh: true },
+    )
     return data
   } catch (error) {
     throw toApiClientError(error)

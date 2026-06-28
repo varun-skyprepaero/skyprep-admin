@@ -10,7 +10,6 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
-  CURRENCY_OPTIONS,
   DIFFICULTY_OPTIONS,
   QUESTION_TYPE_OPTIONS,
 } from '@/features/tests/constants'
@@ -72,6 +71,9 @@ export function PackageSeriesFormDialog({
   form,
   setForm,
   busy,
+  availableQuestionCount = null,
+  poolLoading = false,
+  questionCountTooHigh = false,
   onClose,
   onSubmit,
   subjects,
@@ -103,7 +105,7 @@ export function PackageSeriesFormDialog({
               {dialog.mode === 'create' ? 'New test series' : 'Edit test series'}
             </CardTitle>
             <CardDescription className="text-sm leading-relaxed">
-              Configure catalog details, pricing, and which questions are included in this series.
+              Configure catalog details and which questions are included in this series.
             </CardDescription>
           </div>
           <Button
@@ -165,42 +167,54 @@ export function PackageSeriesFormDialog({
             </FormSection>
 
             <FormSection
-              title="Pricing & time"
-              description="Checkout amount and how long students have to finish once they start."
+              title="Test length"
+              description="How many questions and how long students have per attempt."
             >
-              <div className="grid gap-4 sm:grid-cols-3">
+              <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="pkg-price">Price</Label>
+                  <Label htmlFor="pkg-question-count">Number of questions</Label>
                   <Input
-                    id="pkg-price"
+                    id="pkg-question-count"
                     type="number"
-                    step="0.01"
-                    min="0"
-                    value={form.priceAmount}
-                    onChange={(e) => setForm((s) => ({ ...s, priceAmount: e.target.value }))}
+                    min={1}
+                    max={availableQuestionCount != null && availableQuestionCount > 0 ? availableQuestionCount : undefined}
+                    step={1}
+                    placeholder="All matching questions"
+                    value={form.questionCount}
+                    onChange={(e) => setForm((s) => ({ ...s, questionCount: e.target.value }))}
                     disabled={busy}
-                    required
+                    aria-invalid={questionCountTooHigh}
+                    className={questionCountTooHigh ? 'border-destructive' : undefined}
                   />
+                  {form.subjectUuids.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">
+                      Select at least one subject to see how many questions match your scope.
+                    </p>
+                  ) : poolLoading ? (
+                    <p className="text-xs text-muted-foreground">Counting matching questions…</p>
+                  ) : availableQuestionCount === 0 ? (
+                    <p className="text-xs text-destructive">
+                      No questions match the selected subjects, books, and filters yet.
+                    </p>
+                  ) : availableQuestionCount != null ? (
+                    <p className="text-xs text-muted-foreground">
+                      {availableQuestionCount} question{availableQuestionCount === 1 ? '' : 's'}{' '}
+                      match this scope.
+                      {form.questionCount.trim()
+                        ? ' Each attempt randomly samples from that pool when a limit is set.'
+                        : ' Leave empty to use all of them.'}
+                    </p>
+                  ) : null}
+                  {questionCountTooHigh ? (
+                    <p className="text-xs text-destructive">
+                      {availableQuestionCount === 0
+                        ? 'Cannot set a question limit until at least one question matches this scope.'
+                        : `Limit cannot exceed ${availableQuestionCount} — only that many questions match.`}
+                    </p>
+                  ) : null}
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="pkg-curr">Currency</Label>
-                  <select
-                    id="pkg-curr"
-                    className={selectClass}
-                    value={form.currency}
-                    onChange={(e) => setForm((s) => ({ ...s, currency: e.target.value }))}
-                    disabled={busy}
-                    required
-                  >
-                    {CURRENCY_OPTIONS.map((o) => (
-                      <option key={o.value} value={o.value}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="pkg-time-limit">Time limit (min)</Label>
+                  <Label htmlFor="pkg-time-limit">Time limit (minutes)</Label>
                   <Input
                     id="pkg-time-limit"
                     type="number"
@@ -213,44 +227,28 @@ export function PackageSeriesFormDialog({
                   />
                 </div>
               </div>
-              {dialog.mode === 'edit' ? (
-                <div className="mt-4 space-y-2 rounded-lg border border-dashed border-border bg-background/80 p-3">
-                  <Label htmlFor="pkg-sku-ro" className="text-xs text-muted-foreground">
-                    Internal billing SKU
-                  </Label>
-                  <Input
-                    id="pkg-sku-ro"
-                    readOnly
-                    value={form.billingSku}
-                    className="font-mono text-xs"
-                    disabled={busy}
-                  />
-                </div>
-              ) : null}
             </FormSection>
 
             <FormSection
               title="Catalog & visibility"
-              description="Control who sees this series and whether new purchases are allowed."
+              description="Control whether this series appears in the student catalog."
             >
-              <div className="grid gap-2 sm:grid-cols-2">
-                <CheckboxOption
-                  id="pkg-published"
-                  checked={form.isPublished}
-                  onChange={() => setForm((s) => ({ ...s, isPublished: !s.isPublished }))}
-                  disabled={busy}
-                  label="Published"
-                  hint="Visible in the public test series catalog."
-                />
-                <CheckboxOption
-                  id="pkg-open-purchase"
-                  checked={form.isOpenForPurchase}
-                  onChange={() => setForm((s) => ({ ...s, isOpenForPurchase: !s.isOpenForPurchase }))}
-                  disabled={busy}
-                  label="Open for new purchases"
-                  hint="Existing buyers keep access when unchecked."
-                />
-              </div>
+              <CheckboxOption
+                id="pkg-published"
+                checked={form.isPublished}
+                onChange={() => setForm((s) => ({ ...s, isPublished: !s.isPublished }))}
+                disabled={busy}
+                label="Published"
+                hint="Visible in the public test series catalog for subscribed students."
+              />
+              <CheckboxOption
+                id="pkg-demo"
+                checked={form.isDemo}
+                onChange={() => setForm((s) => ({ ...s, isDemo: !s.isDemo }))}
+                disabled={busy}
+                label="Free demo"
+                hint="Any signed-in student can take this series without a subscription."
+              />
               <div className="mt-4 space-y-2">
                 <Label htmlFor="pkg-suite">Suite (optional)</Label>
                 <select
@@ -378,7 +376,7 @@ export function PackageSeriesFormDialog({
             <Button type="button" variant="outline" onClick={onClose} disabled={busy}>
               Cancel
             </Button>
-            <Button type="submit" disabled={busy} className="min-w-[5.5rem]">
+            <Button type="submit" disabled={busy || questionCountTooHigh} className="min-w-[5.5rem]">
               {busy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
               Save
             </Button>

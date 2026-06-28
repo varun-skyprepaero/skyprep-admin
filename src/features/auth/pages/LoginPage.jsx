@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { Eye, EyeOff, Loader2, Shield } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -24,7 +24,13 @@ const STAFF_ACCESS_DENIED =
   'This portal is for admin staff only. Students and instructors must sign in through the Classroom app.'
 
 export default function LoginPage() {
-  const [form, setForm] = useState({ email: '', password: '' })
+  const [searchParams] = useSearchParams()
+  const emailFromQuery = searchParams.get('email')?.trim() || ''
+
+  const [form, setForm] = useState(() => ({
+    email: emailFromQuery,
+    password: '',
+  }))
   const [errors, setErrors] = useState({})
   const [showPassword, setShowPassword] = useState(false)
 
@@ -154,6 +160,18 @@ export default function LoginPage() {
                   <Eye className="size-4" aria-hidden />
                 )}
               </Button>
+            </div>
+            <div className="flex justify-end">
+              <Link
+                to={
+                  form.email.trim()
+                    ? `/forgot-password?email=${encodeURIComponent(form.email.trim())}`
+                    : '/forgot-password'
+                }
+                className="text-xs font-medium text-primary hover:underline"
+              >
+                Forgot password?
+              </Link>
             </div>
             {errors.password ? (
               <p className="text-sm text-destructive">{errors.password}</p>

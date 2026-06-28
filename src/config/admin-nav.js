@@ -2,16 +2,19 @@ import {
   BookOpen,
   Calendar,
   ClipboardList,
+  Coins,
   FileText,
   HelpCircle,
   KeyRound,
   LayoutDashboard,
+  Package,
   UserCog,
   Users,
 } from 'lucide-react'
 
 import {
   canAccessRolesPermissionsSection,
+  canAccessSubscriptionSection,
   canAccessTestsSection,
   canAccessUsersSection,
 } from '@/features/auth/lib/admin-section-access'
@@ -31,6 +34,13 @@ export const adminNav = [
     canAccess: canAccessTestsSection,
   },
   {
+    name: 'Manage test series',
+    href: '/subscription',
+    icon: Package,
+    canAccess: canAccessSubscriptionSection,
+  },
+  { name: 'Credits', href: '/credits', icon: Coins, disabled: true },
+  {
     name: 'Roles & permissions',
     href: '/roles-permissions',
     icon: KeyRound,
@@ -48,6 +58,8 @@ export function getAdminNavTitle(pathname) {
   if (pathname === '/') return 'Dashboard'
   if (pathname.startsWith('/users')) return 'Users'
   if (pathname.startsWith('/tests')) return 'Tests'
+  if (pathname.startsWith('/subscription')) return 'Manage test series'
+  if (pathname.startsWith('/credits')) return 'Credits'
   if (pathname.startsWith('/roles-permissions')) return 'Roles & permissions'
   const item = adminNav.find(
     (nav) => !nav.disabled && nav.href !== '/' && pathname.startsWith(nav.href),
