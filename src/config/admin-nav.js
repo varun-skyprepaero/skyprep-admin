@@ -4,6 +4,7 @@ import {
   ClipboardList,
   Coins,
   FileText,
+  GraduationCap,
   HelpCircle,
   KeyRound,
   LayoutDashboard,
@@ -13,6 +14,7 @@ import {
 } from 'lucide-react'
 
 import {
+  canAccessExamsSection,
   canAccessRolesPermissionsSection,
   canAccessSubscriptionSection,
   canAccessTestsSection,
@@ -32,6 +34,12 @@ export const adminNav = [
     href: '/tests',
     icon: ClipboardList,
     canAccess: canAccessTestsSection,
+  },
+  {
+    name: 'Exams',
+    href: '/exams',
+    icon: GraduationCap,
+    canAccess: canAccessExamsSection,
   },
   {
     name: 'Manage test series',
@@ -57,6 +65,7 @@ export const adminNav = [
 export function getAdminNavTitle(pathname) {
   if (pathname === '/') return 'Dashboard'
   if (pathname.startsWith('/users')) return 'Users'
+  if (pathname.startsWith('/exams')) return 'Exams'
   if (pathname.startsWith('/tests')) return 'Tests'
   if (pathname.startsWith('/subscription')) return 'Manage test series'
   if (pathname.startsWith('/credits')) return 'Credits'

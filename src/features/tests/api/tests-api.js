@@ -11,8 +11,8 @@ function unwrap(res) {
   return body.data
 }
 
-export async function fetchTestSuites() {
-  const res = await apiClient.get('/bank/suites')
+export async function fetchTestSuites(params = {}) {
+  const res = await apiClient.get('/bank/suites', { params })
   return unwrap(res).suites
 }
 
@@ -28,6 +28,51 @@ export async function updateTestSuite(uuid, payload) {
 
 export async function deleteTestSuite(uuid) {
   const res = await apiClient.delete(`/bank/suites/${uuid}`)
+  return unwrap(res)
+}
+
+export async function fetchTestBoards() {
+  const res = await apiClient.get('/bank/boards')
+  return unwrap(res).boards
+}
+
+export async function createTestBoard(payload) {
+  const res = await apiClient.post('/bank/boards', payload)
+  return unwrap(res).board
+}
+
+export async function updateTestBoard(uuid, payload) {
+  const res = await apiClient.patch(`/bank/boards/${uuid}`, payload)
+  return unwrap(res).board
+}
+
+export async function deleteTestBoard(uuid) {
+  const res = await apiClient.delete(`/bank/boards/${uuid}`)
+  return unwrap(res)
+}
+
+export async function fetchTestExams(params = {}) {
+  const res = await apiClient.get('/bank/exams', { params })
+  return unwrap(res).exams
+}
+
+export async function createTestExam(payload) {
+  const res = await apiClient.post('/bank/exams', payload)
+  return unwrap(res).exam
+}
+
+export async function updateTestExam(uuid, payload) {
+  const res = await apiClient.patch(`/bank/exams/${uuid}`, payload)
+  return unwrap(res).exam
+}
+
+export async function deleteTestExam(uuid) {
+  const res = await apiClient.delete(`/bank/exams/${uuid}`)
+  return unwrap(res)
+}
+
+export async function fetchExamSectionPoolCount(payload) {
+  const res = await apiClient.post('/bank/exams/section-pool-count', payload)
   return unwrap(res)
 }
 
@@ -182,4 +227,9 @@ export async function cancelTestSeriesSubscriber(uuid, payload = {}) {
 export async function grantTestSeriesSubscription(payload) {
   const res = await apiClient.post('/subscriptions/admin/test-series-subscribers/grant', payload)
   return unwrap(res).subscription
+}
+
+export async function fetchOneTimePurchases(params = {}) {
+  const res = await apiClient.get('/purchases/admin/orders', { params })
+  return unwrap(res)
 }

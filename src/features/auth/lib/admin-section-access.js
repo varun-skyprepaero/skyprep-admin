@@ -54,6 +54,7 @@ export function canAccessUsersSection(user, matrix) {
 }
 
 const TEST_SECTION_SCREENS = [
+  'tests.boards',
   'tests.subjects',
   'tests.books',
   'tests.lessons',
@@ -62,9 +63,12 @@ const TEST_SECTION_SCREENS = [
   'tests.packages',
 ]
 
+const EXAMS_SECTION_SCREENS = ['tests.exams']
+
 const SUBSCRIPTION_SECTION_SCREENS = [
   'tests.subscription_plans',
   'tests.subscribers',
+  'tests.purchases',
 ]
 
 /**
@@ -74,6 +78,15 @@ const SUBSCRIPTION_SECTION_SCREENS = [
 export function canAccessTestsSection(user, matrix) {
   if (isSuperAdmin(user)) return true
   return TEST_SECTION_SCREENS.some((screenId) => hasPermission(matrix, screenId, 'view', user))
+}
+
+/**
+ * @param {Parameters<typeof hasAdminPortalRole>[0]} user
+ * @param {import('@/features/roles-permissions/api/permissions-api.types').PermissionMatrix | null | undefined} matrix
+ */
+export function canAccessExamsSection(user, matrix) {
+  if (isSuperAdmin(user)) return true
+  return EXAMS_SECTION_SCREENS.some((screenId) => hasPermission(matrix, screenId, 'view', user))
 }
 
 /**
@@ -128,6 +141,11 @@ export function invitableRoleOptionsForUser(
     return roleOptions.filter((opt) => opt.value !== DATA_ENTRY_ROLE_NAME)
   }
   return roleOptions
+}
+
+/** @param {string} screenId */
+export function canViewExamScreen(user, matrix, screenId) {
+  return hasPermission(matrix, screenId, 'view', user)
 }
 
 /** @param {string} screenId */

@@ -6,11 +6,12 @@ import { usePermissionsStore } from '@/stores/permissions-store'
 import { cn } from '@/lib/utils'
 
 const tabs = [
+  { to: 'boards', label: 'Boards' },
+  { to: 'suites', label: 'Suites' },
   { to: 'subjects', label: 'Subjects' },
   { to: 'books', label: 'Books' },
   { to: 'lessons', label: 'Lessons' },
   { to: 'questions', label: 'Questions' },
-  { to: 'suites', label: 'Suites' },
   { to: 'packages', label: 'Test series' },
 ]
 

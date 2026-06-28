@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils'
 const tabs = [
   { to: 'plans', label: 'Subscription plans', screen: 'tests.subscription_plans' },
   { to: 'subscribers', label: 'Subscribers', screen: 'tests.subscribers' },
+  { to: 'purchases', label: 'One-time purchases', screen: 'tests.purchases' },
 ]
 
 export default function SubscriptionLayout() {

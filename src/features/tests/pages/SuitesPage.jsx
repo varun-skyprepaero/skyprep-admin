@@ -47,8 +47,7 @@ export default function TestsSuitesPage() {
 
   const { data = [], isLoading, isError, error } = useQuery({
     queryKey: qk,
-    queryFn: fetchTestSuites,
-    enabled: true,
+    queryFn: () => fetchTestSuites(),
   })
 
   const filteredRows = useMemo(() => {
@@ -58,6 +57,7 @@ export default function TestsSuitesPage() {
       (s) =>
         s.name.toLowerCase().includes(q) ||
         s.slug.toLowerCase().includes(q) ||
+        (s.boards ?? []).some((b) => b.code.toLowerCase().includes(q)) ||
         (s.description ?? '').toLowerCase().includes(q),
     )
   }, [data, search])
@@ -74,6 +74,7 @@ export default function TestsSuitesPage() {
     onSuccess: () => {
       notifySuccess('Suite created')
       void queryClient.invalidateQueries({ queryKey: qk })
+      void queryClient.invalidateQueries({ queryKey: ['tests', 'boards'] })
       setDialog(null)
     },
     onError: (err) => {
@@ -104,6 +105,7 @@ export default function TestsSuitesPage() {
     onSuccess: () => {
       notifySuccess('Suite deleted')
       void queryClient.invalidateQueries({ queryKey: qk })
+      void queryClient.invalidateQueries({ queryKey: ['tests', 'boards'] })
       void queryClient.invalidateQueries({ queryKey: ['tests', 'packages'] })
       setDeleteTarget(null)
     },
@@ -114,10 +116,7 @@ export default function TestsSuitesPage() {
   })
 
   function openCreate() {
-    setForm({
-      name: '',
-      description: '',
-    })
+    setForm({ name: '', description: '' })
     setDialog({ mode: 'create' })
   }
 
@@ -145,8 +144,8 @@ export default function TestsSuitesPage() {
         <CardHeader className="pb-4">
           <CardTitle>Test suites</CardTitle>
           <CardDescription>
-            License or program groupings (e.g. PPL, CPL, ATPL). Assign test series to a suite so the
-            catalog can filter or display them by program.
+            Standalone license tracks (CPL, ATPL, PPL, …). Suites do not belong to a board — link
+            them to boards from the Boards page.
           </CardDescription>
         </CardHeader>
         <DataTable>
@@ -178,6 +177,7 @@ export default function TestsSuitesPage() {
                     <tr>
                       <th className="px-4 py-3 font-medium">Name</th>
                       <th className="px-4 py-3 font-medium">Slug</th>
+                      <th className="px-4 py-3 font-medium">Used by boards</th>
                       <th className="px-4 py-3 font-medium">Series</th>
                       <DataTableActionsHeader />
                     </tr>
@@ -185,10 +185,8 @@ export default function TestsSuitesPage() {
                   <tbody>
                     {filteredRows.length === 0 ? (
                       <tr>
-                        <td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">
-                          {data.length === 0
-                            ? 'No suites yet.'
-                            : 'No results match your search.'}
+                        <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">
+                          {data.length === 0 ? 'No suites yet.' : 'No results match your search.'}
                         </td>
                       </tr>
                     ) : (
@@ -196,15 +194,21 @@ export default function TestsSuitesPage() {
                         <tr key={row.uuid} className="border-b border-border/60 last:border-0">
                           <td className="px-4 py-3">{row.name}</td>
                           <td className="px-4 py-3 font-mono text-xs">{row.slug}</td>
+                          <td className="px-4 py-3">
+                            {row.boards?.length ? (
+                              <span className="text-muted-foreground">
+                                {row.boards.map((b) => b.code).join(', ')}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
+                          </td>
                           <td className="px-4 py-3">{row.packageCount ?? '—'}</td>
                           <DataTableRowActions
                             rowId={row.uuid}
                             disabled={deleteMu.isPending}
                             items={[
-                              {
-                                label: 'Edit',
-                                onClick: () => openEdit(row),
-                              },
+                              { label: 'Edit', onClick: () => openEdit(row) },
                               {
                                 label: 'Delete',
                                 destructive: true,
@@ -240,10 +244,7 @@ export default function TestsSuitesPage() {
           >
             <CardHeader>
               <CardTitle>{dialog.mode === 'create' ? 'New suite' : 'Edit suite'}</CardTitle>
-              <CardDescription>
-                Display name and optional description. The slug is generated from the name and
-                cannot be changed after creation.
-              </CardDescription>
+              <CardDescription>Name and description only. Link to boards from the Boards page.</CardDescription>
             </CardHeader>
             <CardContent>
               <form className="space-y-4" onSubmit={submit}>
@@ -313,7 +314,7 @@ export default function TestsSuitesPage() {
           deleteTarget ? (
             <>
               Delete <span className="font-medium text-foreground">{deleteTarget.label}</span>? This
-              cannot be undone.
+              removes it from all boards. This cannot be undone.
             </>
           ) : null
         }

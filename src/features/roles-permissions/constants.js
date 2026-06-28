@@ -47,11 +47,13 @@ export const ADMIN_PERMISSION_SECTIONS = [
     id: 'tests',
     label: 'Tests',
     screens: [
+      { id: 'tests.boards', label: 'Boards', actions: ['view', 'create', 'edit', 'delete'] },
       { id: 'tests.subjects', label: 'Subjects', actions: ['view', 'create', 'edit', 'delete'] },
       { id: 'tests.books', label: 'Books', actions: ['view', 'create', 'edit', 'delete'] },
       { id: 'tests.lessons', label: 'Lessons', actions: ['view', 'create', 'edit', 'delete'] },
       { id: 'tests.questions', label: 'Questions', actions: ['view', 'create', 'edit', 'delete'] },
       { id: 'tests.suites', label: 'Suites', actions: ['view', 'create', 'edit', 'delete'] },
+      { id: 'tests.exams', label: 'Exams', actions: ['view', 'create', 'edit', 'delete'] },
       { id: 'tests.packages', label: 'Test series', actions: ['view', 'create', 'edit', 'delete'] },
     ],
   },
@@ -65,6 +67,7 @@ export const ADMIN_PERMISSION_SECTIONS = [
         actions: ['view', 'create', 'edit', 'delete'],
       },
       { id: 'tests.subscribers', label: 'Subscribers', actions: ['view', 'edit'] },
+      { id: 'tests.purchases', label: 'One-time purchases', actions: ['view'] },
     ],
   },
   {

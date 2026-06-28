@@ -3,11 +3,12 @@ import { canViewSubscriptionScreen } from '@/features/auth/lib/admin-section-acc
 import { useAuthStore } from '@/stores/auth-store'
 import { usePermissionsStore } from '@/stores/permissions-store'
 
-const ORDER = ['tests.subscription_plans', 'tests.subscribers']
+const ORDER = ['tests.subscription_plans', 'tests.subscribers', 'tests.purchases']
 
 const ROUTES = {
   'tests.subscription_plans': 'plans',
   'tests.subscribers': 'subscribers',
+  'tests.purchases': 'purchases',
 }
 
 export default function SubscriptionIndexRedirect() {

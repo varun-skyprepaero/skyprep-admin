@@ -13,6 +13,9 @@ const ForgotPasswordPage = lazyWithRetry(() => import('@/features/auth/pages/For
 const RegisterPage = lazyWithRetry(() => import('@/features/auth/pages/RegisterPage'))
 const UsersPage = lazyWithRetry(() => import('@/features/users/pages/UsersPage'))
 const TestsLayout = lazyWithRetry(() => import('@/features/tests/TestsLayout'))
+const ExamsLayout = lazyWithRetry(() => import('@/features/tests/ExamsLayout'))
+const TestsBoardsPage = lazyWithRetry(() => import('@/features/tests/pages/BoardsPage'))
+const ExamsPage = lazyWithRetry(() => import('@/features/tests/pages/ExamsPage'))
 const TestsSubjectsPage = lazyWithRetry(() => import('@/features/tests/pages/SubjectsPage'))
 const TestsBooksPage = lazyWithRetry(() => import('@/features/tests/pages/BooksPage'))
 const TestsLessonsPage = lazyWithRetry(() => import('@/features/tests/pages/LessonsPage'))
@@ -26,6 +29,7 @@ const SubscriptionPlansPage = lazyWithRetry(() =>
   import('@/features/tests/pages/SubscriptionPlansPage'),
 )
 const SubscribersPage = lazyWithRetry(() => import('@/features/tests/pages/SubscribersPage'))
+const PurchasesPage = lazyWithRetry(() => import('@/features/tests/pages/PurchasesPage'))
 const SubscriptionIndexRedirect = lazyWithRetry(() =>
   import('@/features/subscription/SubscriptionIndexRedirect'),
 )
@@ -114,6 +118,10 @@ export const router = createBrowserRouter([
             ),
           },
           {
+            path: '/tests/exams',
+            element: <Navigate to="/exams" replace />,
+          },
+          {
             path: '/tests',
             element: (
               <SuspensePage>
@@ -121,7 +129,15 @@ export const router = createBrowserRouter([
               </SuspensePage>
             ),
             children: [
-              { index: true, element: <Navigate to="subjects" replace /> },
+              { index: true, element: <Navigate to="boards" replace /> },
+              {
+                path: 'boards',
+                element: (
+                  <SuspensePage>
+                    <TestsBoardsPage />
+                  </SuspensePage>
+                ),
+              },
               {
                 path: 'subjects',
                 element: (
@@ -173,6 +189,24 @@ export const router = createBrowserRouter([
             ],
           },
           {
+            path: '/exams',
+            element: (
+              <SuspensePage>
+                <ExamsLayout />
+              </SuspensePage>
+            ),
+            children: [
+              {
+                index: true,
+                element: (
+                  <SuspensePage>
+                    <ExamsPage />
+                  </SuspensePage>
+                ),
+              },
+            ],
+          },
+          {
             path: '/subscription',
             element: (
               <SuspensePage>
@@ -196,6 +230,14 @@ export const router = createBrowserRouter([
                 element: (
                   <SuspensePage>
                     <SubscribersPage />
+                  </SuspensePage>
+                ),
+              },
+              {
+                path: 'purchases',
+                element: (
+                  <SuspensePage>
+                    <PurchasesPage />
                   </SuspensePage>
                 ),
               },
