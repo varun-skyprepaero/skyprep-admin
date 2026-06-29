@@ -10,8 +10,10 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
+import { DataTablePagination } from '@/components/ui/data-table'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { usePaginatedRows } from '@/hooks/use-paginated-rows'
 import {
   createSubscriptionPlan,
   createSubscriptionPlanPair,
@@ -37,11 +39,29 @@ const MARKET_OPTIONS = [
   { value: 'INTL', label: 'International (rest of world)' },
 ]
 
+const MARKET_FILTER_OPTIONS = [{ value: '', label: 'All markets' }, ...MARKET_OPTIONS]
+
+const INTERVAL_FILTER_OPTIONS = [
+  { value: '', label: 'All intervals' },
+  { value: 'month', label: 'Monthly' },
+  { value: 'year', label: 'Yearly' },
+]
+
+const ACTIVE_FILTER_OPTIONS = [
+  { value: '', label: 'All plans' },
+  { value: 'active', label: 'Active only' },
+  { value: 'inactive', label: 'Inactive only' },
+]
+
 export default function SubscriptionPlansPage() {
   const queryClient = useQueryClient()
   const user = useAuthStore((s) => s.user)
   const matrix = usePermissionsStore((s) => s.matrix)
   const canDelete = hasPermission(matrix, 'tests.subscription_plans', 'delete', user)
+  const [search, setSearch] = useState('')
+  const [marketFilter, setMarketFilter] = useState('')
+  const [intervalFilter, setIntervalFilter] = useState('')
+  const [activeFilter, setActiveFilter] = useState('')
   const [dialog, setDialog] = useState(null)
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [form, setForm] = useState({
@@ -131,6 +151,23 @@ export default function SubscriptionPlansPage() {
   })
 
   const rows = useMemo(() => (Array.isArray(data) ? data : []), [data])
+
+  const filteredRows = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    return rows.filter((row) => {
+      if (marketFilter && row.market !== marketFilter) return false
+      if (intervalFilter && row.interval !== intervalFilter) return false
+      if (activeFilter === 'active' && row.isActive === false) return false
+      if (activeFilter === 'inactive' && row.isActive !== false) return false
+      if (!q) return true
+      const label = String(row.label ?? '').toLowerCase()
+      const planKey = String(row.planKey ?? '').toLowerCase()
+      return label.includes(q) || planKey.includes(q)
+    })
+  }, [rows, search, marketFilter, intervalFilter, activeFilter])
+
+  const { paginatedRows, paginationProps, resetPage } = usePaginatedRows(filteredRows)
+
   const busy = createMu.isPending || updateMu.isPending
 
   function openCreate() {
@@ -183,7 +220,76 @@ export default function SubscriptionPlansPage() {
             Add plan
           </Button>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="space-y-2 sm:col-span-2 lg:col-span-1">
+              <Label htmlFor="plan-search">Search</Label>
+              <Input
+                id="plan-search"
+                placeholder="Label or plan key…"
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value)
+                  resetPage()
+                }}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="plan-market">Market</Label>
+              <select
+                id="plan-market"
+                className={selectClass}
+                value={marketFilter}
+                onChange={(e) => {
+                  setMarketFilter(e.target.value)
+                  resetPage()
+                }}
+              >
+                {MARKET_FILTER_OPTIONS.map((opt) => (
+                  <option key={opt.value || 'all'} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="plan-interval">Interval</Label>
+              <select
+                id="plan-interval"
+                className={selectClass}
+                value={intervalFilter}
+                onChange={(e) => {
+                  setIntervalFilter(e.target.value)
+                  resetPage()
+                }}
+              >
+                {INTERVAL_FILTER_OPTIONS.map((opt) => (
+                  <option key={opt.value || 'all'} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="plan-active">Status</Label>
+              <select
+                id="plan-active"
+                className={selectClass}
+                value={activeFilter}
+                onChange={(e) => {
+                  setActiveFilter(e.target.value)
+                  resetPage()
+                }}
+              >
+                {ACTIVE_FILTER_OPTIONS.map((opt) => (
+                  <option key={opt.value || 'all'} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
           {isLoading ? (
             <div className="flex justify-center py-12">
               <Loader2 className="size-8 animate-spin text-primary" aria-hidden />
@@ -191,8 +297,9 @@ export default function SubscriptionPlansPage() {
           ) : isError ? (
             <p className="text-sm text-destructive">{error?.message ?? 'Unable to load'}</p>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[640px] text-left text-sm">
+            <>
+              <div className="overflow-x-auto rounded-md border border-border/60">
+                <table className="w-full min-w-[640px] text-left text-sm">
                 <thead className="border-b bg-muted/40 text-xs uppercase text-muted-foreground">
                   <tr>
                     <th className="px-4 py-3 font-medium">Label</th>
@@ -206,14 +313,14 @@ export default function SubscriptionPlansPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.length === 0 ? (
+                  {paginatedRows.length === 0 ? (
                     <tr>
                       <td colSpan={8} className="px-4 py-8 text-center text-muted-foreground">
-                        No subscription plans yet.
+                        No subscription plans match your filters.
                       </td>
                     </tr>
                   ) : (
-                    rows.map((row) => (
+                    paginatedRows.map((row) => (
                       <tr key={row.uuid} className="border-b border-border/60 last:border-0">
                         <td className="px-4 py-3">{row.label}</td>
                         <td className="px-4 py-3">
@@ -278,7 +385,9 @@ export default function SubscriptionPlansPage() {
                   )}
                 </tbody>
               </table>
-            </div>
+              </div>
+              <DataTablePagination {...paginationProps} />
+            </>
           )}
         </CardContent>
       </Card>

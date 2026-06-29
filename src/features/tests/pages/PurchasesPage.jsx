@@ -8,6 +8,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
+import { DataTablePagination } from '@/components/ui/data-table'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { fetchOneTimePurchases } from '@/features/tests/api/tests-api'
@@ -20,12 +21,6 @@ const STATUS_OPTIONS = [
   { value: 'PENDING_PAYMENT', label: 'Pending payment' },
   { value: 'CANCELLED', label: 'Cancelled' },
   { value: 'REFUNDED', label: 'Refunded' },
-]
-
-const CATALOG_OPTIONS = [
-  { value: '', label: 'All products' },
-  { value: 'exam', label: 'Exams' },
-  { value: 'test_package', label: 'Test series' },
 ]
 
 function formatMoney(amount, currency) {
@@ -44,7 +39,6 @@ function formatMoney(amount, currency) {
 
 function catalogLabel(catalog) {
   if (catalog === 'exam') return 'Exam'
-  if (catalog === 'test_package') return 'Test series'
   return catalog || '—'
 }
 
@@ -66,19 +60,22 @@ function statusBadgeClass(status) {
 export default function PurchasesPage() {
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('')
-  const [catalog, setCatalog] = useState('')
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
 
   const { data, isLoading, isError, error } = useQuery({
-    queryKey: [...qk, search, status, catalog],
+    queryKey: [...qk, search, status, page, pageSize],
     queryFn: () =>
       fetchOneTimePurchases({
         q: search || undefined,
         status: status || undefined,
-        catalog: catalog || undefined,
+        page,
+        pageSize,
       }),
   })
 
   const rows = useMemo(() => data?.orders ?? [], [data])
+  const pagination = data?.pagination ?? { page: 1, pageSize: 10, total: 0 }
 
   return (
     <div className="space-y-4">
@@ -86,19 +83,22 @@ export default function PurchasesPage() {
         <CardHeader className="pb-4">
           <CardTitle>One-time purchases</CardTitle>
           <CardDescription>
-            Exam checkouts and other one-time Razorpay orders. Subscription billing is listed
-            under Subscribers.
+            One-time exam checkouts via Razorpay. Test series access is subscription-only — see
+            Subscribers.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-3">
-            <div className="space-y-2 sm:col-span-1">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
               <Label htmlFor="purchase-search">Search student</Label>
               <Input
                 id="purchase-search"
                 placeholder="Name or email…"
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={(e) => {
+                  setSearch(e.target.value)
+                  setPage(1)
+                }}
               />
             </div>
             <div className="space-y-2">
@@ -107,24 +107,12 @@ export default function PurchasesPage() {
                 id="purchase-status"
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                 value={status}
-                onChange={(e) => setStatus(e.target.value)}
+                onChange={(e) => {
+                  setStatus(e.target.value)
+                  setPage(1)
+                }}
               >
                 {STATUS_OPTIONS.map((opt) => (
-                  <option key={opt.value || 'all'} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="purchase-catalog">Product type</Label>
-              <select
-                id="purchase-catalog"
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                value={catalog}
-                onChange={(e) => setCatalog(e.target.value)}
-              >
-                {CATALOG_OPTIONS.map((opt) => (
                   <option key={opt.value || 'all'} value={opt.value}>
                     {opt.label}
                   </option>
@@ -140,8 +128,9 @@ export default function PurchasesPage() {
           ) : isError ? (
             <p className="text-sm text-destructive">{error?.message ?? 'Unable to load purchases'}</p>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[960px] text-left text-sm">
+            <>
+              <div className="overflow-x-auto rounded-md border border-border/60">
+                <table className="w-full min-w-[960px] text-left text-sm">
                 <thead className="border-b bg-muted/40 text-xs uppercase text-muted-foreground">
                   <tr>
                     <th className="px-4 py-3 font-medium">Date</th>
@@ -204,7 +193,18 @@ export default function PurchasesPage() {
                   )}
                 </tbody>
               </table>
-            </div>
+              </div>
+              <DataTablePagination
+                page={pagination.page}
+                pageSize={pagination.pageSize}
+                total={pagination.total}
+                onPageChange={setPage}
+                onPageSizeChange={(size) => {
+                  setPageSize(size)
+                  setPage(1)
+                }}
+              />
+            </>
           )}
         </CardContent>
       </Card>
