@@ -72,13 +72,13 @@ export default function TestsSuitesPage() {
         description: form.description.trim() || null,
       }),
     onSuccess: () => {
-      notifySuccess('Suite created')
+      notifySuccess('License created')
       void queryClient.invalidateQueries({ queryKey: qk })
       void queryClient.invalidateQueries({ queryKey: ['tests', 'boards'] })
       setDialog(null)
     },
     onError: (err) => {
-      const { message } = handleApiError(err, 'Unable to create suite')
+      const { message } = handleApiError(err, 'Unable to create license')
       notifyError(message)
     },
   })
@@ -90,12 +90,12 @@ export default function TestsSuitesPage() {
         description: form.description.trim() || null,
       }),
     onSuccess: () => {
-      notifySuccess('Suite updated')
+      notifySuccess('License updated')
       void queryClient.invalidateQueries({ queryKey: qk })
       setDialog(null)
     },
     onError: (err) => {
-      const { message } = handleApiError(err, 'Unable to update suite')
+      const { message } = handleApiError(err, 'Unable to update license')
       notifyError(message)
     },
   })
@@ -103,14 +103,14 @@ export default function TestsSuitesPage() {
   const deleteMu = useMutation({
     mutationFn: (uuid) => deleteTestSuite(uuid),
     onSuccess: () => {
-      notifySuccess('Suite deleted')
+      notifySuccess('License deleted')
       void queryClient.invalidateQueries({ queryKey: qk })
       void queryClient.invalidateQueries({ queryKey: ['tests', 'boards'] })
       void queryClient.invalidateQueries({ queryKey: ['tests', 'packages'] })
       setDeleteTarget(null)
     },
     onError: (err) => {
-      const { message } = handleApiError(err, 'Unable to delete suite')
+      const { message } = handleApiError(err, 'Unable to delete license')
       notifyError(message)
     },
   })
@@ -142,9 +142,9 @@ export default function TestsSuitesPage() {
     <div className="space-y-4">
       <Card>
         <CardHeader className="pb-4">
-          <CardTitle>Test suites</CardTitle>
+          <CardTitle>Licenses</CardTitle>
           <CardDescription>
-            Standalone license tracks (CPL, ATPL, PPL, …). Suites do not belong to a board — link
+            Standalone license tracks (CPL, ATPL, PPL, …). Licenses do not belong to a board — link
             them to boards from the Boards page.
           </CardDescription>
         </CardHeader>
@@ -158,7 +158,7 @@ export default function TestsSuitesPage() {
           >
             <Button type="button" size="sm" onClick={openCreate}>
               <Plus className="size-4" aria-hidden />
-              Add suite
+              Add license
             </Button>
           </DataTableToolbar>
           <DataTableContent>
@@ -168,7 +168,7 @@ export default function TestsSuitesPage() {
               </div>
             ) : isError ? (
               <p className="p-6 text-sm text-destructive">
-                {error?.message ?? 'Unable to load suites'}
+                {error?.message ?? 'Unable to load licenses'}
               </p>
             ) : (
               <div className="overflow-x-auto">
@@ -186,7 +186,7 @@ export default function TestsSuitesPage() {
                     {filteredRows.length === 0 ? (
                       <tr>
                         <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">
-                          {data.length === 0 ? 'No suites yet.' : 'No results match your search.'}
+                          {data.length === 0 ? 'No licenses yet.' : 'No results match your search.'}
                         </td>
                       </tr>
                     ) : (
@@ -243,7 +243,7 @@ export default function TestsSuitesPage() {
             onClick={(e) => e.stopPropagation()}
           >
             <CardHeader>
-              <CardTitle>{dialog.mode === 'create' ? 'New suite' : 'Edit suite'}</CardTitle>
+              <CardTitle>{dialog.mode === 'create' ? 'New license' : 'Edit license'}</CardTitle>
               <CardDescription>Name and description only. Link to boards from the Boards page.</CardDescription>
             </CardHeader>
             <CardContent>
@@ -309,7 +309,7 @@ export default function TestsSuitesPage() {
 
       <DeleteConfirmDialog
         open={Boolean(deleteTarget)}
-        title="Delete suite?"
+        title="Delete license?"
         description={
           deleteTarget ? (
             <>

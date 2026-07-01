@@ -355,7 +355,7 @@ export default function ExamsDemoPage() {
         <div>
           <h2 className="text-xl font-semibold tracking-tight">Exams</h2>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-            Compose board + suite exams (e.g. DGCA — CPL) with subject sections, each with its own
+            Compose board + license exams (e.g. DGCA — CPL) with subject sections, each with its own
             timer, marks from the question pool, and passing criteria.
           </p>
         </div>
@@ -378,7 +378,7 @@ export default function ExamsDemoPage() {
         <Card className="h-fit shadow-none">
           <CardHeader className="pb-3">
             <CardTitle className="text-base">Exam catalog</CardTitle>
-            <CardDescription>Board × suite combinations</CardDescription>
+            <CardDescription>Board × license combinations</CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
             {exams.map((exam) => (
@@ -479,7 +479,7 @@ export default function ExamsDemoPage() {
           >
             <CardHeader>
               <CardTitle id="create-exam-title">New exam</CardTitle>
-              <CardDescription>Pick a regulatory board and license suite.</CardDescription>
+              <CardDescription>Pick a regulatory board and license.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
@@ -502,7 +502,7 @@ export default function ExamsDemoPage() {
                 </select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="exam-suite">Suite</Label>
+                <Label htmlFor="exam-suite">License</Label>
                 <select
                   id="exam-suite"
                   className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"

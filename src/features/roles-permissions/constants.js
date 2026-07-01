@@ -52,7 +52,7 @@ export const ADMIN_PERMISSION_SECTIONS = [
       { id: 'tests.books', label: 'Books', actions: ['view', 'create', 'edit', 'delete'] },
       { id: 'tests.lessons', label: 'Lessons', actions: ['view', 'create', 'edit', 'delete'] },
       { id: 'tests.questions', label: 'Questions', actions: ['view', 'create', 'edit', 'delete'] },
-      { id: 'tests.suites', label: 'Suites', actions: ['view', 'create', 'edit', 'delete'] },
+      { id: 'tests.suites', label: 'Licenses', actions: ['view', 'create', 'edit', 'delete'] },
       { id: 'tests.exams', label: 'Exams', actions: ['view', 'create', 'edit', 'delete'] },
       { id: 'tests.packages', label: 'Test series', actions: ['view', 'create', 'edit', 'delete'] },
     ],

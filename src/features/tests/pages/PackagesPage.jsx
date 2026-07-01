@@ -24,6 +24,7 @@ import { usePaginatedRows } from '@/hooks/use-paginated-rows'
 import {
   createTestPackage,
   deleteTestPackage,
+  fetchTestBoards,
   fetchTestBooks,
   fetchTestPackageQuestionPoolCount,
   fetchTestPackages,
@@ -37,6 +38,7 @@ import { slugifyFromName } from '@/lib/slug'
 
 const qkPkgs = ['tests', 'packages']
 const qkSubjects = ['tests', 'subjects']
+const qkBoards = ['tests', 'boards']
 const qkSuites = ['tests', 'suites']
 
 export default function TestsPackagesPage() {
@@ -55,7 +57,8 @@ export default function TestsPackagesPage() {
     difficultyFilter: [],
     questionTypeFilter: [],
     bookUuids: [],
-    suiteUuid: '',
+    boardUuids: [],
+    suiteUuids: [],
     timeLimitMinutes: '',
     questionCount: '',
   })
@@ -63,6 +66,12 @@ export default function TestsPackagesPage() {
   const { data: subjects = [] } = useQuery({
     queryKey: qkSubjects,
     queryFn: fetchTestSubjects,
+    enabled: true,
+  })
+
+  const { data: boards = [] } = useQuery({
+    queryKey: qkBoards,
+    queryFn: fetchTestBoards,
     enabled: true,
   })
 
@@ -90,6 +99,8 @@ export default function TestsPackagesPage() {
   const poolScopeKey = [
     form.subjectUuids.join(','),
     form.bookUuids.join(','),
+    form.boardUuids.join(','),
+    form.suiteUuids.join(','),
     form.difficultyFilter.join(','),
     form.questionTypeFilter.join(','),
   ].join('|')
@@ -100,6 +111,8 @@ export default function TestsPackagesPage() {
       fetchTestPackageQuestionPoolCount({
         subjectUuids: form.subjectUuids,
         bookUuids: form.bookUuids,
+        boardUuids: form.boardUuids,
+        suiteUuids: form.suiteUuids,
         difficultyFilter: form.difficultyFilter,
         questionTypeFilter: form.questionTypeFilter,
       }),
@@ -123,8 +136,12 @@ export default function TestsPackagesPage() {
       (p) =>
         p.name.toLowerCase().includes(q) ||
         p.slug.toLowerCase().includes(q) ||
-        (p.suite?.name ?? '').toLowerCase().includes(q) ||
-        (p.suite?.slug ?? '').toLowerCase().includes(q),
+        (p.boards ?? []).some((b) => (b.code ?? b.name ?? '').toLowerCase().includes(q)) ||
+        (p.suites ?? []).some(
+          (s) =>
+            (s.name ?? '').toLowerCase().includes(q) ||
+            (s.slug ?? '').toLowerCase().includes(q),
+        ),
     )
   }, [data, search])
 
@@ -142,7 +159,8 @@ export default function TestsPackagesPage() {
         difficultyFilter: form.difficultyFilter,
         questionTypeFilter: form.questionTypeFilter,
         bookUuids: form.bookUuids,
-        ...(form.suiteUuid.trim() ? { suiteUuid: form.suiteUuid.trim() } : {}),
+        boardUuids: form.boardUuids,
+        suiteUuids: form.suiteUuids,
         timeLimitMinutes: form.timeLimitMinutes.trim()
           ? Number(form.timeLimitMinutes)
           : null,
@@ -170,7 +188,8 @@ export default function TestsPackagesPage() {
         difficultyFilter: form.difficultyFilter,
         questionTypeFilter: form.questionTypeFilter,
         bookUuids: form.bookUuids,
-        suiteUuid: form.suiteUuid.trim() ? form.suiteUuid.trim() : null,
+        boardUuids: form.boardUuids,
+        suiteUuids: form.suiteUuids,
         timeLimitMinutes: form.timeLimitMinutes.trim()
           ? Number(form.timeLimitMinutes)
           : null,
@@ -218,6 +237,24 @@ export default function TestsPackagesPage() {
     })
   }
 
+  function toggleBoard(uuid) {
+    setForm((s) => {
+      const set = new Set(s.boardUuids)
+      if (set.has(uuid)) set.delete(uuid)
+      else set.add(uuid)
+      return { ...s, boardUuids: [...set] }
+    })
+  }
+
+  function toggleSuite(uuid) {
+    setForm((s) => {
+      const set = new Set(s.suiteUuids)
+      if (set.has(uuid)) set.delete(uuid)
+      else set.add(uuid)
+      return { ...s, suiteUuids: [...set] }
+    })
+  }
+
   function toggleBook(uuid) {
     setForm((s) => {
       const set = new Set(s.bookUuids)
@@ -247,7 +284,8 @@ export default function TestsPackagesPage() {
       difficultyFilter: [],
       questionTypeFilter: [],
       bookUuids: [],
-      suiteUuid: '',
+      boardUuids: [],
+      suiteUuids: [],
       timeLimitMinutes: '',
       questionCount: '',
     })
@@ -265,7 +303,8 @@ export default function TestsPackagesPage() {
       difficultyFilter: row.difficultyFilter ?? [],
       questionTypeFilter: row.questionTypeFilter ?? [],
       bookUuids: (row.books ?? []).map((b) => b.uuid),
-      suiteUuid: row.suite?.uuid ?? '',
+      boardUuids: (row.boards ?? []).map((b) => b.uuid),
+      suiteUuids: (row.suites ?? []).map((s) => s.uuid),
       timeLimitMinutes:
         row.timeLimitMinutes != null && row.timeLimitMinutes > 0
           ? String(row.timeLimitMinutes)
@@ -306,8 +345,8 @@ export default function TestsPackagesPage() {
               <CardTitle>Test series</CardTitle>
               <CardDescription>
                 Configure test series in the student catalog. Mark series as free demos for students
-                without a subscription, or leave them subscription-only. Optionally assign a suite
-                (PPL, CPL, ATPL, …) and scope questions by subjects, difficulty, type, and books.
+                without a subscription, or leave them subscription-only. Scope questions by subjects,
+                boards, licenses, difficulty, type, and books.
               </CardDescription>
             </div>
             <Button
@@ -348,7 +387,8 @@ export default function TestsPackagesPage() {
                   <thead className="border-b bg-muted/40 text-xs uppercase text-muted-foreground">
                     <tr>
                       <th className="px-4 py-3 font-medium">Name</th>
-                      <th className="px-4 py-3 font-medium">Suite</th>
+                      <th className="px-4 py-3 font-medium">Boards</th>
+                      <th className="px-4 py-3 font-medium">Licenses</th>
                       <th className="px-4 py-3 font-medium">Slug</th>
                       <th className="px-4 py-3 font-medium">Questions</th>
                       <th className="px-4 py-3 font-medium">Time limit</th>
@@ -361,7 +401,7 @@ export default function TestsPackagesPage() {
                   <tbody>
                     {filteredRows.length === 0 ? (
                       <tr>
-                        <td colSpan={9} className="px-4 py-8 text-center text-muted-foreground">
+                        <td colSpan={10} className="px-4 py-8 text-center text-muted-foreground">
                           {data.length === 0
                             ? 'No test series yet.'
                             : 'No results match your search.'}
@@ -372,7 +412,10 @@ export default function TestsPackagesPage() {
                         <tr key={row.uuid} className="border-b border-border/60 last:border-0">
                           <td className="px-4 py-3">{row.name}</td>
                           <td className="px-4 py-3 text-xs">
-                            {row.suite ? `${row.suite.name} (${row.suite.slug})` : '—'}
+                            {(row.boards ?? []).map((b) => b.code || b.name).join(', ') || '—'}
+                          </td>
+                          <td className="px-4 py-3 text-xs">
+                            {(row.suites ?? []).map((s) => s.name).join(', ') || '—'}
                           </td>
                           <td className="px-4 py-3 font-mono text-xs">{row.slug}</td>
                           <td className="px-4 py-3 text-xs tabular-nums">
@@ -435,12 +478,15 @@ export default function TestsPackagesPage() {
           onClose={() => setDialog(null)}
           onSubmit={submit}
           subjects={subjects}
+          boards={boards}
           suites={suites}
           booksForPackage={booksForPackage}
           toggleSubject={toggleSubject}
           toggleDifficulty={toggleDifficulty}
           toggleQuestionType={toggleQuestionType}
           toggleBook={toggleBook}
+          toggleBoard={toggleBoard}
+          toggleSuite={toggleSuite}
         />
       ) : null}
 

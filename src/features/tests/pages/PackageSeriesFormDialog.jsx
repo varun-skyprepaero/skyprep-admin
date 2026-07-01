@@ -77,12 +77,15 @@ export function PackageSeriesFormDialog({
   onClose,
   onSubmit,
   subjects,
+  boards,
   suites,
   booksForPackage,
   toggleSubject,
   toggleDifficulty,
   toggleQuestionType,
   toggleBook,
+  toggleBoard,
+  toggleSuite,
 }) {
   const catalogSlugPreview = slugifyFromName(form.name)
 
@@ -194,7 +197,7 @@ export function PackageSeriesFormDialog({
                     <p className="text-xs text-muted-foreground">Counting matching questions…</p>
                   ) : availableQuestionCount === 0 ? (
                     <p className="text-xs text-destructive">
-                      No questions match the selected subjects, books, and filters yet.
+                      No questions match the selected subjects, books, boards, licenses, and filters yet.
                     </p>
                   ) : availableQuestionCount != null ? (
                     <p className="text-xs text-muted-foreground">
@@ -249,23 +252,6 @@ export function PackageSeriesFormDialog({
                 label="Free demo"
                 hint="Any signed-in student can take this series without a subscription."
               />
-              <div className="mt-4 space-y-2">
-                <Label htmlFor="pkg-suite">Suite (optional)</Label>
-                <select
-                  id="pkg-suite"
-                  className={selectClass}
-                  value={form.suiteUuid}
-                  onChange={(e) => setForm((s) => ({ ...s, suiteUuid: e.target.value }))}
-                  disabled={busy}
-                >
-                  <option value="">None</option>
-                  {suites.map((s) => (
-                    <option key={s.uuid} value={s.uuid}>
-                      {s.name} ({s.slug})
-                    </option>
-                  ))}
-                </select>
-              </div>
             </FormSection>
 
             <FormSection
@@ -340,6 +326,50 @@ export function PackageSeriesFormDialog({
                       />
                     ))}
                   </div>
+                </div>
+
+                <div className="space-y-3 rounded-lg border border-border/50 bg-background/60 p-3 lg:col-span-2">
+                  <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Boards
+                  </Label>
+                  {boards.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">No boards yet.</p>
+                  ) : (
+                    <div className="max-h-44 space-y-1 overflow-y-auto pr-1">
+                      {boards.map((b) => (
+                        <CheckboxOption
+                          key={b.uuid}
+                          id={`pkg-board-${b.uuid}`}
+                          checked={form.boardUuids.includes(b.uuid)}
+                          onChange={() => toggleBoard(b.uuid)}
+                          disabled={busy}
+                          label={b.code ? `${b.code} — ${b.name}` : b.name}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-3 rounded-lg border border-border/50 bg-background/60 p-3 lg:col-span-2">
+                  <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Licenses
+                  </Label>
+                  {suites.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">No licenses yet.</p>
+                  ) : (
+                    <div className="max-h-44 space-y-1 overflow-y-auto pr-1">
+                      {suites.map((s) => (
+                        <CheckboxOption
+                          key={s.uuid}
+                          id={`pkg-suite-${s.uuid}`}
+                          checked={form.suiteUuids.includes(s.uuid)}
+                          onChange={() => toggleSuite(s.uuid)}
+                          disabled={busy}
+                          label={`${s.name} (${s.slug})`}
+                        />
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-3 rounded-lg border border-border/50 bg-background/60 p-3 lg:col-span-2">

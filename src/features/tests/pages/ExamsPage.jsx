@@ -699,7 +699,7 @@ export default function ExamsPage() {
         <div>
           <h2 className="text-xl font-semibold tracking-tight">Exams</h2>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-            Define board + suite exam blueprints with subject sections, each with its own timer,
+            Define board + license exam blueprints with subject sections, each with its own timer,
             marks, and pass threshold. Overall pass requires every section to pass.
           </p>
         </div>
@@ -720,12 +720,12 @@ export default function ExamsPage() {
           <Card className="h-fit shadow-none">
             <CardHeader className="pb-3">
               <CardTitle className="text-base">Exam catalog</CardTitle>
-              <CardDescription>Board × suite combinations</CardDescription>
+              <CardDescription>Board × license combinations</CardDescription>
             </CardHeader>
             <CardContent className="space-y-2">
               {exams.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
-                  No exams yet. Link suites to boards, then create an exam blueprint.
+                  No exams yet. Link licenses to boards, then create an exam blueprint.
                 </p>
               ) : (
                 exams.map((exam) => (
@@ -1012,7 +1012,7 @@ export default function ExamsPage() {
             <CardHeader>
               <CardTitle>New exam</CardTitle>
               <CardDescription>
-                One exam blueprint per board + suite. The suite must be linked to the board.
+                One exam blueprint per board + license. The license must be linked to the board.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -1038,7 +1038,7 @@ export default function ExamsPage() {
                 </select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="exam-suite">Suite</Label>
+                <Label htmlFor="exam-suite">License</Label>
                 <select
                   id="exam-suite"
                   className={selectClass}
@@ -1054,7 +1054,7 @@ export default function ExamsPage() {
                 </select>
                 {draftSuites.length === 0 ? (
                   <p className="text-xs text-muted-foreground">
-                    Link suites to this board before creating an exam.
+                    Link licenses to this board before creating an exam.
                   </p>
                 ) : null}
               </div>

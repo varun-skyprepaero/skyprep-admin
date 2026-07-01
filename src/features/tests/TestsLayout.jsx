@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils'
 
 const tabs = [
   { to: 'boards', label: 'Boards' },
-  { to: 'suites', label: 'Suites' },
+  { to: 'suites', label: 'Licenses' },
   { to: 'subjects', label: 'Subjects' },
   { to: 'books', label: 'Books' },
   { to: 'lessons', label: 'Lessons' },

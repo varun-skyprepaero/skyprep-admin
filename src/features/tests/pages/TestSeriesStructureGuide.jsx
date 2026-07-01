@@ -1,4 +1,4 @@
-import { BookOpen, HelpCircle, Layers, Library, ListChecks, Tag, X } from 'lucide-react'
+import { BookOpen, HelpCircle, Layers, Library, ListChecks, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -94,11 +94,6 @@ export function TestSeriesStructureGuide({ open, onClose }) {
                   detail="The student-facing mock test: scope, length, time limit, demo flag."
                 />
                 <FlowStep
-                  icon={Tag}
-                  label="Suite (optional)"
-                  detail="A label like PPL, CPL, or Demo — groups series in the catalog only."
-                />
-                <FlowStep
                   icon={Layers}
                   label="Subscription / demo"
                   detail="Who can take a series: all subscribers, or free demo for everyone."
@@ -114,7 +109,7 @@ export function TestSeriesStructureGuide({ open, onClose }) {
                 </div>
                 <div className="grid gap-1 px-3 py-2.5 sm:grid-cols-[7rem_1fr]">
                   <dt className="font-medium text-foreground">Question</dt>
-                  <dd>The actual exam item. Always tied to one subject; may also be tagged with books or lessons.</dd>
+                  <dd>The actual exam item. Always tied to one subject; may also be tagged with books, boards, licenses, or lessons.</dd>
                 </div>
                 <div className="grid gap-1 px-3 py-2.5 sm:grid-cols-[7rem_1fr]">
                   <dt className="font-medium text-foreground">Book</dt>
@@ -125,12 +120,16 @@ export function TestSeriesStructureGuide({ open, onClose }) {
                   <dd>Chapter or topic inside a subject — helps organize questions in admin. Does not filter a test series today.</dd>
                 </div>
                 <div className="grid gap-1 px-3 py-2.5 sm:grid-cols-[7rem_1fr]">
-                  <dt className="font-medium text-foreground">Test series</dt>
-                  <dd>The recipe: which subjects, optional books, difficulty, question types, count, and time limit.</dd>
+                  <dt className="font-medium text-foreground">Board</dt>
+                  <dd>Optional authority tag on a question (DGCA, FAA, …). Narrows a test series when selected.</dd>
                 </div>
                 <div className="grid gap-1 px-3 py-2.5 sm:grid-cols-[7rem_1fr]">
-                  <dt className="font-medium text-foreground">Suite</dt>
-                  <dd>Optional program bucket (PPL, CPL, …). Label only — does not change which questions are included.</dd>
+                  <dt className="font-medium text-foreground">License</dt>
+                  <dd>Optional program tag on a question (PPL, CPL, …). Narrows a test series when selected.</dd>
+                </div>
+                <div className="grid gap-1 px-3 py-2.5 sm:grid-cols-[7rem_1fr]">
+                  <dt className="font-medium text-foreground">Test series</dt>
+                  <dd>The recipe: which subjects, optional boards, licenses, books, difficulty, question types, count, and time limit.</dd>
                 </div>
               </dl>
             </GuideSection>
@@ -147,6 +146,11 @@ export function TestSeriesStructureGuide({ open, onClose }) {
                   questions linked to those books are used.
                 </li>
                 <li>
+                  <strong className="font-medium text-foreground">Boards & licenses</strong> —
+                  optional. If selected, only questions tagged with those boards and/or licenses are
+                  used.
+                </li>
+                <li>
                   <strong className="font-medium text-foreground">Difficulty & type</strong> —
                   optional. Leave empty to include all levels and types.
                 </li>
@@ -157,8 +161,8 @@ export function TestSeriesStructureGuide({ open, onClose }) {
                 </li>
               </ol>
               <p className="rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-foreground">
-                All filters work together: a question must match every rule you set (subject and
-                book, if any, and difficulty and type, if any).
+                All filters work together: a question must match every rule you set (subject,
+                boards, licenses, books if any, and difficulty and type if any).
               </p>
             </GuideSection>
 
@@ -188,9 +192,8 @@ export function TestSeriesStructureGuide({ open, onClose }) {
                 <li className="flex gap-2">
                   <BookOpen className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden />
                   <span>
-                    <strong className="font-medium text-foreground">PPL catalog group</strong> —
-                    assign suite PPL for labeling; question scope is still driven by subjects and
-                    filters, not the suite name.
+                    <strong className="font-medium text-foreground">PPL mock</strong> — subject +
+                    CPL license filter → only questions tagged for that license.
                   </span>
                 </li>
               </ul>

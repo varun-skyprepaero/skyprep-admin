@@ -34,10 +34,12 @@ import { QuestionLinkMultiSelect } from '@/features/tests/components/QuestionLin
 import {
   createTestQuestion,
   deleteTestQuestion,
+  fetchTestBoards,
   fetchTestBooks,
   fetchTestLessons,
   fetchTestQuestions,
   fetchTestSubjects,
+  fetchTestSuites,
   updateTestQuestion,
 } from '@/features/tests/api/tests-api'
 import { handleApiError } from '@/lib/http/api-error'
@@ -47,6 +49,8 @@ const qkQ = ['tests', 'questions']
 const qkSubjects = ['tests', 'subjects']
 const qkBooks = ['tests', 'books']
 const qkLessons = ['tests', 'lessons']
+const qkBoards = ['tests', 'boards']
+const qkSuites = ['tests', 'suites']
 
 export default function TestsQuestionsPage() {
   const queryClient = useQueryClient()
@@ -58,6 +62,8 @@ export default function TestsQuestionsPage() {
     subjectUuid: '',
     bookUuids: [],
     lessonUuids: [],
+    boardUuids: [],
+    suiteUuids: [],
     type: 'SINGLE_CHOICE',
     difficulty: 'MEDIUM',
     score: '1',
@@ -97,6 +103,8 @@ export default function TestsQuestionsPage() {
         subjectUuid: form.subjectUuid.trim(),
         bookUuids: form.bookUuids,
         lessonUuids: form.lessonUuids,
+        boardUuids: form.boardUuids,
+        suiteUuids: form.suiteUuids,
         type: form.type,
         difficulty: form.difficulty,
         score: form.score,
@@ -122,6 +130,8 @@ export default function TestsQuestionsPage() {
         subjectUuid: form.subjectUuid.trim(),
         bookUuids: form.bookUuids,
         lessonUuids: form.lessonUuids,
+        boardUuids: form.boardUuids,
+        suiteUuids: form.suiteUuids,
         type: form.type,
         difficulty: form.difficulty,
         score: form.score,
@@ -173,11 +183,25 @@ export default function TestsQuestionsPage() {
     enabled: Boolean(dialog && form.subjectUuid),
   })
 
+  const { data: boardsForForm = [] } = useQuery({
+    queryKey: [...qkBoards, 'form'],
+    queryFn: fetchTestBoards,
+    enabled: Boolean(dialog),
+  })
+
+  const { data: suitesForForm = [] } = useQuery({
+    queryKey: [...qkSuites, 'form'],
+    queryFn: fetchTestSuites,
+    enabled: Boolean(dialog),
+  })
+
   function openCreate() {
     setForm({
       subjectUuid: subjectFilter || '',
       bookUuids: [],
       lessonUuids: [],
+      boardUuids: [],
+      suiteUuids: [],
       type: 'SINGLE_CHOICE',
       difficulty: 'MEDIUM',
       score: '1',
@@ -202,6 +226,8 @@ export default function TestsQuestionsPage() {
       subjectUuid: row.subject?.uuid ?? '',
       bookUuids: (row.books ?? (row.book ? [row.book] : [])).map((b) => b.uuid),
       lessonUuids: (row.lessons ?? []).map((l) => l.uuid),
+      boardUuids: (row.boards ?? []).map((b) => b.uuid),
+      suiteUuids: (row.suites ?? []).map((s) => s.uuid),
       type,
       difficulty: row.difficulty,
       score: String(row.score ?? '1'),
@@ -286,6 +312,8 @@ export default function TestsQuestionsPage() {
                       <th className="px-4 py-3 font-medium">Subject</th>
                       <th className="px-4 py-3 font-medium">Books</th>
                       <th className="px-4 py-3 font-medium">Lessons</th>
+                      <th className="px-4 py-3 font-medium">Boards</th>
+                      <th className="px-4 py-3 font-medium">Licenses</th>
                       <th className="px-4 py-3 font-medium">Type</th>
                       <th className="px-4 py-3 font-medium">Difficulty</th>
                       <th className="px-4 py-3 font-medium">Score</th>
@@ -295,7 +323,7 @@ export default function TestsQuestionsPage() {
                   <tbody>
                     {filteredRows.length === 0 ? (
                       <tr>
-                        <td colSpan={8} className="px-4 py-8 text-center text-muted-foreground">
+                        <td colSpan={10} className="px-4 py-8 text-center text-muted-foreground">
                           {data.length === 0
                             ? 'No questions yet.'
                             : 'No results match your search.'}
@@ -315,6 +343,12 @@ export default function TestsQuestionsPage() {
                           </td>
                           <td className="px-4 py-3 text-xs">
                             {(row.lessons ?? []).map((l) => l.name).join(', ') || '—'}
+                          </td>
+                          <td className="px-4 py-3 text-xs">
+                            {(row.boards ?? []).map((b) => b.code || b.name).join(', ') || '—'}
+                          </td>
+                          <td className="px-4 py-3 text-xs">
+                            {(row.suites ?? []).map((s) => s.name).join(', ') || '—'}
                           </td>
                           <td className="px-4 py-3 text-xs">{row.type}</td>
                           <td className="px-4 py-3 text-xs">{row.difficulty}</td>
@@ -380,6 +414,8 @@ export default function TestsQuestionsPage() {
                         subjectUuid: e.target.value,
                         bookUuids: [],
                         lessonUuids: [],
+                        boardUuids: [],
+                        suiteUuids: [],
                       }))
                     }
                     disabled={createMu.isPending || updateMu.isPending}
@@ -409,6 +445,28 @@ export default function TestsQuestionsPage() {
                     selected={form.lessonUuids}
                     disabled={createMu.isPending || updateMu.isPending || !form.subjectUuid}
                     onChange={(lessonUuids) => setForm((s) => ({ ...s, lessonUuids }))}
+                  />
+                  <QuestionLinkMultiSelect
+                    label="Boards (optional)"
+                    emptyLabel="No boards yet"
+                    options={boardsForForm.map((b) => ({
+                      uuid: b.uuid,
+                      label: b.code ? `${b.code} — ${b.name}` : b.name,
+                    }))}
+                    selected={form.boardUuids}
+                    disabled={createMu.isPending || updateMu.isPending}
+                    onChange={(boardUuids) => setForm((s) => ({ ...s, boardUuids }))}
+                  />
+                  <QuestionLinkMultiSelect
+                    label="Licenses (optional)"
+                    emptyLabel="No licenses yet"
+                    options={suitesForForm.map((s) => ({
+                      uuid: s.uuid,
+                      label: `${s.name} (${s.slug})`,
+                    }))}
+                    selected={form.suiteUuids}
+                    disabled={createMu.isPending || updateMu.isPending}
+                    onChange={(suiteUuids) => setForm((s) => ({ ...s, suiteUuids }))}
                   />
                 </div>
                 <div className="grid gap-3 sm:grid-cols-3">

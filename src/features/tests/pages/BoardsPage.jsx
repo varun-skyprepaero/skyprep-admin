@@ -89,16 +89,16 @@ function BoardSuitePicker({ suites, selectedUuids, disabled, onToggle }) {
   return (
     <div className="space-y-3 rounded-lg border border-border/70 bg-muted/15 p-4">
       <div>
-        <Label htmlFor="board-suite-filter">Suites</Label>
+        <Label htmlFor="board-suite-filter">Licenses</Label>
         <p className="mt-0.5 text-xs text-muted-foreground">
-          Choose from the suites catalog. Selected suites are linked to this board.
+          Choose from the licenses catalog. Selected licenses are linked to this board.
         </p>
       </div>
       {suites.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          No suites yet.{' '}
+          No licenses yet.{' '}
           <Link to="/tests/suites" className="font-medium text-primary underline-offset-4 hover:underline">
-            Add suites
+            Add licenses
           </Link>{' '}
           first, then assign them here.
         </p>
@@ -108,12 +108,12 @@ function BoardSuitePicker({ suites, selectedUuids, disabled, onToggle }) {
             id="board-suite-filter"
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
-            placeholder="Search suites…"
+            placeholder="Search licenses…"
             disabled={disabled}
           />
           <div className="max-h-52 space-y-2 overflow-y-auto pr-1">
             {filtered.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No suites match your search.</p>
+              <p className="text-sm text-muted-foreground">No licenses match your search.</p>
             ) : (
               filtered.map((suite) => {
                 const boardCodes = (suite.boards ?? []).map((b) => b.code).filter(Boolean)
@@ -136,7 +136,7 @@ function BoardSuitePicker({ suites, selectedUuids, disabled, onToggle }) {
             )}
           </div>
           <p className="text-xs text-muted-foreground">
-            {selectedUuids.length} suite{selectedUuids.length === 1 ? '' : 's'} selected
+            {selectedUuids.length} license{selectedUuids.length === 1 ? '' : 's'} selected
           </p>
         </>
       )}
@@ -279,13 +279,13 @@ export default function TestsBoardsPage() {
         <CardHeader className="pb-4">
           <CardTitle>Boards</CardTitle>
           <CardDescription>
-            Regulatory boards (DGCA, FAA, …). Create suites in the{' '}
+            Regulatory boards (DGCA, FAA, …). Create licenses in the{' '}
             <button
               type="button"
               className="font-medium text-primary underline-offset-4 hover:underline"
               onClick={() => navigate('/tests/suites')}
             >
-              Suites
+              Licenses
             </button>{' '}
             table, then link them to a board when creating or editing.
           </CardDescription>
@@ -319,7 +319,7 @@ export default function TestsBoardsPage() {
                     <tr>
                       <th className="px-4 py-3 font-medium">Code</th>
                       <th className="px-4 py-3 font-medium">Name</th>
-                      <th className="px-4 py-3 font-medium">Suites</th>
+                      <th className="px-4 py-3 font-medium">Licenses</th>
                       <th className="px-4 py-3 font-medium">Description</th>
                       <DataTableActionsHeader />
                     </tr>
@@ -402,7 +402,7 @@ export default function TestsBoardsPage() {
                 {dialog.mode === 'create' ? 'New board' : 'Edit board'}
               </CardTitle>
               <CardDescription>
-                Board details plus which suites from the catalog belong to this board.
+                Board details plus which licenses from the catalog belong to this board.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -470,7 +470,7 @@ export default function TestsBoardsPage() {
           deleteTarget ? (
             <>
               Delete <span className="font-medium text-foreground">{deleteTarget.label}</span>?
-              Board–suite links are removed; suite records are kept.
+              Board–license links are removed; license records are kept.
             </>
           ) : null
         }
