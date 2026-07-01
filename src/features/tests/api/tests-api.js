@@ -183,17 +183,12 @@ export async function deleteTestPackage(uuid) {
 
 export async function fetchSubscriptionPlans() {
   const res = await apiClient.get('/subscriptions/admin/subscription-plans')
-  return unwrap(res).plans
+  return unwrap(res)
 }
 
 export async function createSubscriptionPlan(payload) {
   const res = await apiClient.post('/subscriptions/admin/subscription-plans', payload)
   return unwrap(res).plan
-}
-
-export async function createSubscriptionPlanPair(payload) {
-  const res = await apiClient.post('/subscriptions/admin/subscription-plans/pair', payload)
-  return unwrap(res).plans
 }
 
 export async function updateSubscriptionPlan(uuid, payload) {
@@ -206,8 +201,20 @@ export async function resyncSubscriptionPlan(uuid) {
   return unwrap(res).plan
 }
 
-export async function deleteSubscriptionPlan(uuid) {
-  const res = await apiClient.delete(`/subscriptions/admin/subscription-plans/${uuid}`)
+export async function deleteSubscriptionPlan(uuid, payload = {}) {
+  const res = await apiClient.delete(`/subscriptions/admin/subscription-plans/${uuid}`, {
+    data: payload,
+  })
+  return unwrap(res)
+}
+
+export async function fetchPlanSunsetPreview(uuid) {
+  const res = await apiClient.get(`/subscriptions/admin/subscription-plans/${uuid}/sunset-preview`)
+  return unwrap(res)
+}
+
+export async function sunsetSubscriptionPlan(uuid, payload) {
+  const res = await apiClient.post(`/subscriptions/admin/subscription-plans/${uuid}/sunset`, payload)
   return unwrap(res)
 }
 
@@ -216,11 +223,31 @@ export async function fetchTestSeriesSubscribers(params = {}) {
   return unwrap(res)
 }
 
+export async function fetchTestSeriesSubscriberCancelPreview(uuid) {
+  const res = await apiClient.get(
+    `/subscriptions/admin/test-series-subscribers/${uuid}/cancel-preview`,
+  )
+  return unwrap(res)
+}
+
 export async function cancelTestSeriesSubscriber(uuid, payload = {}) {
   const res = await apiClient.post(
     `/subscriptions/admin/test-series-subscribers/${uuid}/cancel`,
     payload,
   )
+  return unwrap(res)
+}
+
+export async function pauseTestSeriesSubscriber(uuid, payload = {}) {
+  const res = await apiClient.post(
+    `/subscriptions/admin/test-series-subscribers/${uuid}/pause`,
+    payload,
+  )
+  return unwrap(res)
+}
+
+export async function resumeTestSeriesSubscriber(uuid) {
+  const res = await apiClient.post(`/subscriptions/admin/test-series-subscribers/${uuid}/resume`)
   return unwrap(res).subscription
 }
 
