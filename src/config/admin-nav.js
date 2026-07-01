@@ -42,7 +42,7 @@ export const adminNav = [
     canAccess: canAccessExamsSection,
   },
   {
-    name: 'Manage test series',
+    name: 'Subscriptions',
     href: '/subscription',
     icon: Package,
     canAccess: canAccessSubscriptionSection,
@@ -67,7 +67,7 @@ export function getAdminNavTitle(pathname) {
   if (pathname.startsWith('/users')) return 'Users'
   if (pathname.startsWith('/exams')) return 'Exams'
   if (pathname.startsWith('/tests')) return 'Tests'
-  if (pathname.startsWith('/subscription')) return 'Manage test series'
+  if (pathname.startsWith('/subscription')) return 'Subscriptions'
   if (pathname.startsWith('/credits')) return 'Credits'
   if (pathname.startsWith('/roles-permissions')) return 'Roles & permissions'
   const item = adminNav.find(

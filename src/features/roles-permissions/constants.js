@@ -59,7 +59,7 @@ export const ADMIN_PERMISSION_SECTIONS = [
   },
   {
     id: 'subscription',
-    label: 'Manage test series',
+    label: 'Subscriptions',
     screens: [
       {
         id: 'tests.subscription_plans',
