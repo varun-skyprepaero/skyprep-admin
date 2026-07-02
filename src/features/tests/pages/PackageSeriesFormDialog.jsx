@@ -96,7 +96,7 @@ export function PackageSeriesFormDialog({
       onClick={() => !busy && onClose()}
     >
       <Card
-        className="relative z-10 grid max-h-[min(92vh,100dvh-2rem)] w-full max-w-3xl grid-rows-[auto_minmax(0,1fr)] overflow-hidden p-0 shadow-xl"
+        className="relative z-10 flex max-h-[min(92vh,100dvh-2rem)] w-full max-w-3xl flex-col overflow-hidden p-0 shadow-xl"
         role="dialog"
         aria-modal="true"
         aria-labelledby="pkg-dialog-title"
@@ -124,11 +124,8 @@ export function PackageSeriesFormDialog({
           </Button>
         </CardHeader>
 
-        <form
-          className="grid min-h-0 grid-rows-[minmax(0,1fr)_auto] overflow-hidden"
-          onSubmit={onSubmit}
-        >
-          <CardContent className="min-h-0 overflow-y-auto overscroll-contain px-6 py-5">
+        <form className="flex min-h-0 flex-col" onSubmit={onSubmit}>
+          <CardContent className="max-h-[calc(min(92vh,100dvh-2rem)-10rem)] overflow-y-auto overscroll-contain px-6 py-5">
             <div className="space-y-5">
             <FormSection title="Basics" description="How this series appears in the student catalog.">
               <div className="space-y-2">
