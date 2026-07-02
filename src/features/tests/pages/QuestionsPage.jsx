@@ -45,6 +45,8 @@ import {
 import { handleApiError } from '@/lib/http/api-error'
 import { notifyError, notifySuccess } from '@/lib/notifications'
 
+const FILTER_NO_LESSON = '__no_lesson__'
+
 const qkQ = ['tests', 'questions']
 const qkSubjects = ['tests', 'subjects']
 const qkBooks = ['tests', 'books']
@@ -82,17 +84,27 @@ export default function TestsQuestionsPage() {
 
   const listParams = useMemo(() => {
     const params = {}
-    if (subjectFilter) params.subjectUuid = subjectFilter
-    if (lessonFilter) params.lessonUuid = lessonFilter
+    if (subjectFilter === FILTER_NO_LESSON) {
+      params.noLesson = true
+    } else if (subjectFilter) {
+      params.subjectUuid = subjectFilter
+    }
+    if (lessonFilter === FILTER_NO_LESSON) {
+      params.noLesson = true
+    } else if (lessonFilter) {
+      params.lessonUuid = lessonFilter
+    }
     if (difficultyFilter) params.difficulty = difficultyFilter
     return params
   }, [subjectFilter, lessonFilter, difficultyFilter])
 
-  const lessonsFilterParams = subjectFilter ? { subjectUuid: subjectFilter } : {}
+  const subjectSelected =
+    Boolean(subjectFilter) && subjectFilter !== FILTER_NO_LESSON
+  const lessonsFilterParams = subjectSelected ? { subjectUuid: subjectFilter } : {}
   const { data: lessonsForFilter = [] } = useQuery({
     queryKey: [...qkLessons, 'filter', lessonsFilterParams],
     queryFn: () => fetchTestLessons(lessonsFilterParams),
-    enabled: Boolean(subjectFilter),
+    enabled: subjectSelected,
   })
 
   const { data = [], isLoading, isError, error } = useQuery({
@@ -302,6 +314,7 @@ export default function TestsQuestionsPage() {
               }}
             >
               <option value="">All subjects</option>
+              <option value={FILTER_NO_LESSON}>No subject</option>
               {subjects.map((s) => (
                 <option key={s.uuid} value={s.uuid}>
                   {s.name}
@@ -312,15 +325,16 @@ export default function TestsQuestionsPage() {
               className={dataTableSelectClass}
               aria-label="Filter by lesson"
               value={lessonFilter}
-              disabled={!subjectFilter}
+              disabled={!subjectSelected}
               onChange={(e) => {
                 setLessonFilter(e.target.value)
                 resetPage()
               }}
             >
               <option value="">
-                {subjectFilter ? 'All lessons' : 'Select subject first'}
+                {subjectSelected ? 'All lessons' : 'Select subject first'}
               </option>
+              <option value={FILTER_NO_LESSON}>No lesson</option>
               {lessonsForFilter.map((lesson) => (
                 <option key={lesson.uuid} value={lesson.uuid}>
                   {lesson.name}
