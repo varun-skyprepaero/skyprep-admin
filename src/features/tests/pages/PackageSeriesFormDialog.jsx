@@ -96,13 +96,13 @@ export function PackageSeriesFormDialog({
       onClick={() => !busy && onClose()}
     >
       <Card
-        className="relative z-10 flex max-h-[min(92vh,100dvh-2rem)] w-full max-w-3xl flex-col overflow-hidden p-0 shadow-xl"
+        className="relative z-10 w-full max-w-3xl max-h-[90vh] overflow-y-auto overscroll-contain p-0 shadow-xl"
         role="dialog"
         aria-modal="true"
         aria-labelledby="pkg-dialog-title"
         onClick={(e) => e.stopPropagation()}
       >
-        <CardHeader className="flex shrink-0 flex-row items-start justify-between gap-4 space-y-0 border-b bg-muted/30 px-6 py-5">
+        <CardHeader className="sticky top-0 z-10 flex flex-row items-start justify-between gap-4 space-y-0 border-b bg-card/95 px-6 py-5 backdrop-blur-sm">
           <div className="space-y-1.5 pr-2">
             <CardTitle id="pkg-dialog-title" className="text-xl">
               {dialog.mode === 'create' ? 'New test series' : 'Edit test series'}
@@ -124,8 +124,8 @@ export function PackageSeriesFormDialog({
           </Button>
         </CardHeader>
 
-        <form className="flex min-h-0 flex-col" onSubmit={onSubmit}>
-          <CardContent className="max-h-[calc(min(92vh,100dvh-2rem)-10rem)] overflow-y-auto overscroll-contain px-6 py-5">
+        <form onSubmit={onSubmit}>
+          <CardContent className="px-6 py-5">
             <div className="space-y-5">
             <FormSection title="Basics" description="How this series appears in the student catalog.">
               <div className="space-y-2">
@@ -402,7 +402,7 @@ export function PackageSeriesFormDialog({
             </div>
           </CardContent>
 
-          <div className="flex shrink-0 justify-end gap-2 border-t bg-card px-6 py-4">
+          <div className="sticky bottom-0 z-10 flex justify-end gap-2 border-t bg-card/95 px-6 py-4 backdrop-blur-sm">
             <Button type="button" variant="outline" onClick={onClose} disabled={busy}>
               Cancel
             </Button>
