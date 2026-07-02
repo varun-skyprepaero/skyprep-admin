@@ -56,6 +56,8 @@ export default function TestsQuestionsPage() {
   const queryClient = useQueryClient()
   const [search, setSearch] = useState('')
   const [subjectFilter, setSubjectFilter] = useState('')
+  const [lessonFilter, setLessonFilter] = useState('')
+  const [difficultyFilter, setDifficultyFilter] = useState('')
   const [dialog, setDialog] = useState(null)
   const [deleteTarget, setDeleteTarget] = useState(/** @type {{ uuid: string, label: string } | null} */ (null))
   const [form, setForm] = useState({
@@ -78,7 +80,21 @@ export default function TestsQuestionsPage() {
     enabled: true,
   })
 
-  const listParams = subjectFilter ? { subjectUuid: subjectFilter } : {}
+  const listParams = useMemo(() => {
+    const params = {}
+    if (subjectFilter) params.subjectUuid = subjectFilter
+    if (lessonFilter) params.lessonUuid = lessonFilter
+    if (difficultyFilter) params.difficulty = difficultyFilter
+    return params
+  }, [subjectFilter, lessonFilter, difficultyFilter])
+
+  const lessonsFilterParams = subjectFilter ? { subjectUuid: subjectFilter } : {}
+  const { data: lessonsForFilter = [] } = useQuery({
+    queryKey: [...qkLessons, 'filter', lessonsFilterParams],
+    queryFn: () => fetchTestLessons(lessonsFilterParams),
+    enabled: Boolean(subjectFilter),
+  })
+
   const { data = [], isLoading, isError, error } = useQuery({
     queryKey: [...qkQ, listParams],
     queryFn: () => fetchTestQuestions(listParams),
@@ -281,6 +297,7 @@ export default function TestsQuestionsPage() {
               value={subjectFilter}
               onChange={(e) => {
                 setSubjectFilter(e.target.value)
+                setLessonFilter('')
                 resetPage()
               }}
             >
@@ -288,6 +305,41 @@ export default function TestsQuestionsPage() {
               {subjects.map((s) => (
                 <option key={s.uuid} value={s.uuid}>
                   {s.name}
+                </option>
+              ))}
+            </select>
+            <select
+              className={dataTableSelectClass}
+              aria-label="Filter by lesson"
+              value={lessonFilter}
+              disabled={!subjectFilter}
+              onChange={(e) => {
+                setLessonFilter(e.target.value)
+                resetPage()
+              }}
+            >
+              <option value="">
+                {subjectFilter ? 'All lessons' : 'Select subject first'}
+              </option>
+              {lessonsForFilter.map((lesson) => (
+                <option key={lesson.uuid} value={lesson.uuid}>
+                  {lesson.name}
+                </option>
+              ))}
+            </select>
+            <select
+              className={dataTableSelectClass}
+              aria-label="Filter by difficulty"
+              value={difficultyFilter}
+              onChange={(e) => {
+                setDifficultyFilter(e.target.value)
+                resetPage()
+              }}
+            >
+              <option value="">All difficulties</option>
+              {DIFFICULTY_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
                 </option>
               ))}
             </select>
@@ -326,7 +378,7 @@ export default function TestsQuestionsPage() {
                         <td colSpan={10} className="px-4 py-8 text-center text-muted-foreground">
                           {data.length === 0
                             ? 'No questions yet.'
-                            : 'No results match your search.'}
+                            : 'No results match your filters.'}
                         </td>
                       </tr>
                     ) : (
