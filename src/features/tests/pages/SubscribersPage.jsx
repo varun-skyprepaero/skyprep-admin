@@ -18,10 +18,11 @@ import {
   fetchSubscriptionPlans,
   fetchTestSeriesSubscriberCancelPreview,
   fetchTestSeriesSubscribers,
-  grantTestSeriesSubscription,
   pauseTestSeriesSubscriber,
   resumeTestSeriesSubscriber,
+  revokeTestSeriesGrant,
 } from '@/features/tests/api/tests-api'
+import { GrantAccessDialog } from '@/features/subscription/components/GrantAccessDialog'
 import { handleApiError } from '@/lib/http/api-error'
 import { notifyError, notifySuccess } from '@/lib/notifications'
 
@@ -35,6 +36,12 @@ const STATUS_OPTIONS = [
   { value: 'CANCELLED', label: 'Cancelled' },
   { value: 'PAUSED', label: 'Paused' },
   { value: 'COMPLETED', label: 'Completed' },
+]
+
+const GRANT_TYPE_OPTIONS = [
+  { value: '', label: 'All access types' },
+  { value: 'granted', label: 'Admin grants' },
+  { value: 'paid', label: 'Paid (Razorpay)' },
 ]
 
 function statusBadgeClass(status) {
@@ -101,14 +108,36 @@ function formatPlanMeta(row) {
 }
 
 /**
- * @param {string | null | undefined} externalId
+ * @param {{ grantedByAdmin?: boolean, paymentProvider?: string, externalSubscriptionId?: string | null }} row
  */
-function formatExternalSubscriptionRef(externalId) {
+function isAdminGrant(row) {
+  if (row.grantedByAdmin) return true
+  if (row.paymentProvider === 'internal') return true
+  const id = String(row.externalSubscriptionId || '')
+  return id.startsWith('internal_')
+}
+
+/**
+ * @param {{ grantedByAdmin?: boolean, paymentProvider?: string, externalSubscriptionId?: string | null }} row
+ */
+function formatProviderLabel(row) {
+  if (isAdminGrant(row)) return 'Admin grant'
+  if (row.paymentProvider === 'razorpay') return 'Razorpay'
+  if (row.paymentProvider === 'internal_simulation') return 'Simulation'
+  return row.paymentProvider || '—'
+}
+
+/**
+ * @param {string | null | undefined} externalId
+ * @param {{ grantedByAdmin?: boolean, paymentProvider?: string }} row
+ */
+function formatExternalSubscriptionRef(externalId, row) {
   const id = String(externalId || '').trim()
   if (!id) return null
+  if (isAdminGrant(row)) return 'Complimentary access'
   if (id.startsWith('pending_')) return 'Pending checkout'
   if (id.startsWith('sim_')) return id
-  if (id.startsWith('internal_')) return 'Internal grant'
+  if (id.startsWith('internal_')) return 'Complimentary access'
   return id
 }
 
@@ -116,6 +145,7 @@ export default function SubscribersPage() {
   const queryClient = useQueryClient()
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('')
+  const [grantType, setGrantType] = useState('')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [grantOpen, setGrantOpen] = useState(false)
@@ -123,18 +153,17 @@ export default function SubscribersPage() {
   const [pauseReason, setPauseReason] = useState('')
   const [cancelTarget, setCancelTarget] = useState(null)
   const [cancelMode, setCancelMode] = useState('period_end')
-  const [grantForm, setGrantForm] = useState({
-    email: '',
-    planKey: '',
-    periodEnd: '',
-  })
+  const [revokeTarget, setRevokeTarget] = useState(
+    /** @type {null | { uuid: string, name: string, email?: string, planLabel?: string }} */ (null),
+  )
 
   const { data, isLoading, isError, error } = useQuery({
-    queryKey: [...qk, search, status, page, pageSize],
+    queryKey: [...qk, search, status, grantType, page, pageSize],
     queryFn: () =>
       fetchTestSeriesSubscribers({
         q: search || undefined,
         status: status || undefined,
+        grantType: grantType || undefined,
         page,
         pageSize,
       }),
@@ -144,7 +173,6 @@ export default function SubscribersPage() {
     queryKey: ['tests', 'subscription-plans'],
     queryFn: fetchSubscriptionPlans,
   })
-  const plans = Array.isArray(plansPayload?.plans) ? plansPayload.plans : []
   const entitlementProducts = Array.isArray(plansPayload?.entitlementProducts)
     ? plansPayload.entitlementProducts
     : []
@@ -214,24 +242,25 @@ export default function SubscribersPage() {
     onError: (err) => notifyError(handleApiError(err).message),
   })
 
-  const actionBusy = cancelMu.isPending || pauseMu.isPending || resumeMu.isPending
-
-  const grantMu = useMutation({
-    mutationFn: () =>
-      grantTestSeriesSubscription({
-        email: grantForm.email.trim(),
-        planKey: grantForm.planKey,
-        periodEnd: grantForm.periodEnd.trim()
-          ? new Date(grantForm.periodEnd).toISOString()
-          : undefined,
-      }),
-    onSuccess: () => {
-      notifySuccess('Access granted')
-      setGrantOpen(false)
+  const revokeMu = useMutation({
+    mutationFn: (uuid) => revokeTestSeriesGrant(uuid),
+    onSuccess: (result) => {
+      if (result?.emailSent === false && result?.emailError) {
+        notifyError(`Access revoked, but email failed: ${result.emailError}`)
+      } else {
+        notifySuccess(
+          result?.emailSent
+            ? 'Granted access revoked — student notified by email'
+            : 'Granted access revoked',
+        )
+      }
+      setRevokeTarget(null)
       void queryClient.invalidateQueries({ queryKey: qk })
     },
     onError: (err) => notifyError(handleApiError(err).message),
   })
+
+  const actionBusy = cancelMu.isPending || pauseMu.isPending || resumeMu.isPending || revokeMu.isPending
 
   const rows = useMemo(() => data?.subscribers ?? [], [data])
   const pagination = data?.pagination ?? { page: 1, pageSize: 10, total: 0 }
@@ -253,7 +282,7 @@ export default function SubscribersPage() {
           </Button>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-3">
             <div className="space-y-2">
               <Label htmlFor="subscriber-search">Search student</Label>
               <Input
@@ -279,6 +308,24 @@ export default function SubscribersPage() {
               >
                 {STATUS_OPTIONS.map((opt) => (
                   <option key={opt.value || 'all'} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="subscriber-grant-type">Access type</Label>
+              <select
+                id="subscriber-grant-type"
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                value={grantType}
+                onChange={(e) => {
+                  setGrantType(e.target.value)
+                  setPage(1)
+                }}
+              >
+                {GRANT_TYPE_OPTIONS.map((opt) => (
+                  <option key={opt.value || 'all-grants'} value={opt.value}>
                     {opt.label}
                   </option>
                 ))}
@@ -335,6 +382,7 @@ export default function SubscribersPage() {
                               year: 'numeric',
                             })
                           : null
+                        const adminGrant = isAdminGrant(row)
 
                         return (
                         <tr key={row.uuid} className="border-b border-border/60 last:border-0">
@@ -361,11 +409,23 @@ export default function SubscribersPage() {
                           <td className="px-4 py-3 text-xs">{includes}</td>
                           <td className="px-4 py-3">
                             <div className="space-y-1">
-                              <span
-                                className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${statusBadgeClass(row.status)}`}
-                              >
-                                {row.status.replace(/_/g, ' ')}
-                              </span>
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                <span
+                                  className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${statusBadgeClass(row.status)}`}
+                                >
+                                  {row.status.replace(/_/g, ' ')}
+                                </span>
+                                {adminGrant && row.status !== 'CANCELLED' && row.status !== 'COMPLETED' ? (
+                                  <span className="inline-flex rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-800 dark:bg-violet-950 dark:text-violet-200">
+                                    Granted
+                                  </span>
+                                ) : null}
+                              </div>
+                              {adminGrant && row.grantReason ? (
+                                <p className="text-[11px] text-muted-foreground">
+                                  Note: {row.grantReason}
+                                </p>
+                              ) : null}
                               {row.cancelAtPeriodEnd && row.status === 'ACTIVE' ? (
                                 <p className="text-[11px] text-muted-foreground">
                                   Cancels at period end
@@ -397,13 +457,13 @@ export default function SubscribersPage() {
                             </div>
                           </td>
                           <td className="px-4 py-3 text-xs">
-                            <div className="capitalize">{row.paymentProvider || '—'}</div>
-                            {formatExternalSubscriptionRef(row.externalSubscriptionId) ? (
+                            <div>{formatProviderLabel(row)}</div>
+                            {formatExternalSubscriptionRef(row.externalSubscriptionId, row) ? (
                               <div
                                 className="mt-1 max-w-[14rem] break-all font-mono text-[11px] text-muted-foreground"
-                                title={row.externalSubscriptionId}
+                                title={row.externalSubscriptionId ?? undefined}
                               >
-                                {formatExternalSubscriptionRef(row.externalSubscriptionId)}
+                                {formatExternalSubscriptionRef(row.externalSubscriptionId, row)}
                               </div>
                             ) : null}
                           </td>
@@ -419,51 +479,92 @@ export default function SubscribersPage() {
                           </td>
                           <td className="px-4 py-3">
                             {row.status === 'PAUSED' ? (
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                disabled={actionBusy}
-                                onClick={() => resumeMu.mutate(row.uuid)}
-                              >
-                                Resume
-                              </Button>
-                            ) : row.status === 'ACTIVE' || row.status === 'PAST_DUE' ? (
                               <div className="flex flex-wrap gap-2">
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  variant="secondary"
-                                  disabled={actionBusy}
-                                  onClick={() => {
-                                    setPauseReason('')
-                                    setPauseTarget({
-                                      uuid: row.uuid,
-                                      name: row.user?.name || row.user?.email || 'Student',
-                                      email: row.user?.email,
-                                    })
-                                  }}
-                                >
-                                  Pause
-                                </Button>
                                 <Button
                                   type="button"
                                   size="sm"
                                   variant="outline"
                                   disabled={actionBusy}
-                                  onClick={() => {
-                                    setCancelMode('period_end')
-                                    setCancelTarget({
-                                      uuid: row.uuid,
-                                      name: row.user?.name || row.user?.email || 'Student',
-                                      email: row.user?.email,
-                                      planLabel: formatPlanLabel(row),
-                                      periodEnd,
-                                    })
-                                  }}
+                                  onClick={() => resumeMu.mutate(row.uuid)}
                                 >
-                                  Cancel
+                                  Resume
                                 </Button>
+                                {adminGrant ? (
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="destructive"
+                                    disabled={actionBusy}
+                                    onClick={() =>
+                                      setRevokeTarget({
+                                        uuid: row.uuid,
+                                        name: row.user?.name || row.user?.email || 'Student',
+                                        email: row.user?.email,
+                                        planLabel: formatPlanLabel(row),
+                                      })
+                                    }
+                                  >
+                                    Revoke
+                                  </Button>
+                                ) : null}
+                              </div>
+                            ) : row.status === 'ACTIVE' || row.status === 'PAST_DUE' ? (
+                              <div className="flex flex-wrap gap-2">
+                                {adminGrant ? (
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="destructive"
+                                    disabled={actionBusy}
+                                    onClick={() =>
+                                      setRevokeTarget({
+                                        uuid: row.uuid,
+                                        name: row.user?.name || row.user?.email || 'Student',
+                                        email: row.user?.email,
+                                        planLabel: formatPlanLabel(row),
+                                      })
+                                    }
+                                  >
+                                    Revoke
+                                  </Button>
+                                ) : (
+                                  <>
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant="secondary"
+                                      disabled={actionBusy}
+                                      onClick={() => {
+                                        setPauseReason('')
+                                        setPauseTarget({
+                                          uuid: row.uuid,
+                                          name: row.user?.name || row.user?.email || 'Student',
+                                          email: row.user?.email,
+                                        })
+                                      }}
+                                    >
+                                      Pause
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant="outline"
+                                      disabled={actionBusy}
+                                      onClick={() => {
+                                        setCancelMode('period_end')
+                                        setCancelTarget({
+                                          uuid: row.uuid,
+                                          name: row.user?.name || row.user?.email || 'Student',
+                                          email: row.user?.email,
+                                          planLabel: formatPlanLabel(row),
+                                          periodEnd,
+                                        })
+                                      }}
+                                    >
+                                      Cancel
+                                    </Button>
+                                  </>
+                                )}
                               </div>
                             ) : (
                               '—'
@@ -719,72 +820,56 @@ export default function SubscribersPage() {
         />
       </ActionConfirmDialog>
 
-      {grantOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm">
-          <Card className="w-full max-w-md">
-            <CardHeader>
-              <CardTitle>Grant complimentary access</CardTitle>
-            </CardHeader>
-            <form
-              onSubmit={(e) => {
-                e.preventDefault()
-                grantMu.mutate()
-              }}
-            >
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="grant-email">Student email</Label>
-                  <Input
-                    id="grant-email"
-                    type="email"
-                    value={grantForm.email}
-                    onChange={(e) => setGrantForm((s) => ({ ...s, email: e.target.value }))}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="grant-plan">Plan</Label>
-                  <select
-                    id="grant-plan"
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                    value={grantForm.planKey}
-                    onChange={(e) => setGrantForm((s) => ({ ...s, planKey: e.target.value }))}
-                    required
-                  >
-                    <option value="">Select plan…</option>
-                    {plans.map((p) => (
-                      <option key={p.uuid} value={p.planKey}>
-                        {p.label} · {formatMarket(p.market)} · {formatInterval(p.interval)}
-                        {Array.isArray(p.entitlements) && p.entitlements.length > 0
-                          ? ` · ${formatEntitlementLabels(p.entitlements, entitlementProducts)}`
-                          : ''}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="grant-end">Period end (optional)</Label>
-                  <Input
-                    id="grant-end"
-                    type="datetime-local"
-                    value={grantForm.periodEnd}
-                    onChange={(e) => setGrantForm((s) => ({ ...s, periodEnd: e.target.value }))}
-                  />
-                </div>
-              </CardContent>
-              <div className="flex justify-end gap-2 border-t p-4">
-                <Button type="button" variant="outline" onClick={() => setGrantOpen(false)}>
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={grantMu.isPending}>
-                  {grantMu.isPending ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
-                  Grant
-                </Button>
-              </div>
-            </form>
-          </Card>
-        </div>
-      ) : null}
+      <ActionConfirmDialog
+        open={Boolean(revokeTarget)}
+        title="Revoke granted access?"
+        description={
+          revokeTarget ? (
+            <>
+              Remove complimentary access for <strong>{revokeTarget.name}</strong>
+              {revokeTarget.email ? (
+                <>
+                  {' '}
+                  (<span className="text-foreground">{revokeTarget.email}</span>)
+                </>
+              ) : null}
+              {revokeTarget.planLabel ? (
+                <>
+                  {' '}
+                  on plan <strong>{revokeTarget.planLabel}</strong>
+                </>
+              ) : null}
+              . Access ends immediately.
+            </>
+          ) : null
+        }
+        confirmLabel="Revoke access"
+        cancelLabel="Keep access"
+        confirmVariant="destructive"
+        loading={revokeMu.isPending}
+        onClose={() => {
+          if (revokeMu.isPending) return
+          setRevokeTarget(null)
+        }}
+        onConfirm={() => revokeTarget && revokeMu.mutate(revokeTarget.uuid)}
+      >
+        <ActionImpactList
+          items={[
+            'Test series and question bank access stop immediately.',
+            'This only applies to admin-granted complimentary access.',
+            'The student receives an email that their membership has ended.',
+            'You can grant access again later from this page or the Users page.',
+          ]}
+        />
+      </ActionConfirmDialog>
+
+      <GrantAccessDialog
+        open={grantOpen}
+        onOpenChange={setGrantOpen}
+        onSuccess={() => {
+          void queryClient.invalidateQueries({ queryKey: qk })
+        }}
+      />
     </div>
   )
 }

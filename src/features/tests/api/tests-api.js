@@ -251,6 +251,18 @@ export async function resumeTestSeriesSubscriber(uuid) {
   return unwrap(res).subscription
 }
 
+export async function fetchGrantAccessPreview(email) {
+  const res = await apiClient.get('/subscriptions/admin/test-series-subscribers/grant-preview', {
+    params: { email },
+  })
+  return unwrap(res)
+}
+
+export async function revokeTestSeriesGrant(uuid) {
+  const res = await apiClient.post(`/subscriptions/admin/test-series-subscribers/${uuid}/revoke-grant`)
+  return unwrap(res)
+}
+
 export async function grantTestSeriesSubscription(payload) {
   const res = await apiClient.post('/subscriptions/admin/test-series-subscribers/grant', payload)
   return unwrap(res).subscription

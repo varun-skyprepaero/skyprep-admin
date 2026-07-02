@@ -31,8 +31,11 @@ import {
   canAccessUsersSection,
   canImpersonateClassroomUser,
   canViewUserInDirectory,
+  hasPermission,
   invitableRoleOptionsForUser,
 } from '@/features/auth/lib/admin-section-access'
+import { CLASSROOM_APP_ROLE_NAMES } from '@/features/invitations/constants'
+import { GrantAccessDialog } from '@/features/subscription/components/GrantAccessDialog'
 import { fetchInvitableRoles } from '@/features/roles-permissions/api/permissions-api'
 import { ClassroomImpersonateDialog } from '@/features/users/components/ClassroomImpersonateDialog'
 import { adminUpdateUser, fetchUsers } from '@/features/users/api/users-api'
@@ -276,6 +279,9 @@ export default function UsersPage() {
   const [classroomImpersonateTarget, setClassroomImpersonateTarget] = useState(
     /** @type {null | { uuid: string, email: string, name: string }} */ (null),
   )
+  const [grantAccessTarget, setGrantAccessTarget] = useState(
+    /** @type {null | { email: string, name: string }} */ (null),
+  )
 
   const [tableSearch, setTableSearch] = useState('')
   const [typeFilter, setTypeFilter] = useState('all')
@@ -515,6 +521,23 @@ export default function UsersPage() {
   }
 
   const canImpersonateUsers = canImpersonateClassroomUser(user, matrix)
+  const canGrantAccess = hasPermission(matrix, 'tests.subscribers', 'edit', user)
+
+  function canGrantAccessToRow(row) {
+    return (
+      canGrantAccess &&
+      row.kind === 'user' &&
+      row.isActive &&
+      row.email &&
+      CLASSROOM_APP_ROLE_NAMES.includes(row.roleName ?? '')
+    )
+  }
+
+  function openGrantAccess(row) {
+    if (!canGrantAccessToRow(row)) return
+    const name = [row.firstName, row.lastName].filter(Boolean).join(' ') || row.email || 'Student'
+    setGrantAccessTarget({ email: row.email ?? '', name })
+  }
 
   return (
     <div className="space-y-8">
@@ -523,7 +546,8 @@ export default function UsersPage() {
           <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Users</h1>
           <p className="mt-2 max-w-2xl text-muted-foreground">
             Manage members and pending invitations. Invite people by email; they complete signup via
-            their link.
+            their link. Grant complimentary test series or question bank access to signed-up students
+            from the row menu.
           </p>
         </div>
         <Button type="button" onClick={() => setInviteOpen(true)} className="shrink-0 gap-2">
@@ -766,6 +790,14 @@ export default function UsersPage() {
                                     },
                                   ]
                                 : [
+                                    ...(canGrantAccessToRow(row)
+                                      ? [
+                                          {
+                                            label: 'Grant access',
+                                            onClick: () => openGrantAccess(row),
+                                          },
+                                        ]
+                                      : []),
                                     {
                                       label: 'Edit user',
                                       onClick: () => openEditForUser(row),
@@ -1007,6 +1039,15 @@ export default function UsersPage() {
       <ClassroomImpersonateDialog
         target={classroomImpersonateTarget}
         onClose={() => setClassroomImpersonateTarget(null)}
+      />
+
+      <GrantAccessDialog
+        open={Boolean(grantAccessTarget)}
+        onOpenChange={(open) => {
+          if (!open) setGrantAccessTarget(null)
+        }}
+        initialEmail={grantAccessTarget?.email ?? ''}
+        lockEmail={Boolean(grantAccessTarget?.email)}
       />
 
       {cancelInviteTarget ? (
