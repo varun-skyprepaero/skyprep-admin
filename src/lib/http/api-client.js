@@ -1,6 +1,7 @@
 import axios from 'axios'
 import { env } from '@/config/env'
 import { refreshAccessToken } from '@/lib/auth/token-refresh'
+import { toApiClientError } from '@/lib/http/api-error'
 import {
   SKYPREP_CLIENT_ADMIN,
   SKYPREP_CLIENT_HEADER,
@@ -72,13 +73,13 @@ apiClient.interceptors.response.use(
     const url = originalRequest?.url || ''
 
     if (!originalRequest || shouldSkipAuthHandling(originalRequest)) {
-      return Promise.reject(error)
+      return Promise.reject(toApiClientError(error))
     }
 
     if (status === 401 && !originalRequest._retry) {
       if (url.includes('/auth/refresh') || url.includes('/auth/logout')) {
         authStore.clear()
-        return Promise.reject(error)
+        return Promise.reject(toApiClientError(error))
       }
 
       if (authStore.canRefresh()) {
@@ -89,13 +90,13 @@ apiClient.interceptors.response.use(
           return apiClient(originalRequest)
         } catch {
           authStore.clear()
-          return Promise.reject(error)
+          return Promise.reject(toApiClientError(error))
         }
       }
 
       authStore.clear()
     }
 
-    return Promise.reject(error)
+    return Promise.reject(toApiClientError(error))
   },
 )
