@@ -71,6 +71,7 @@ export function PackageSeriesFormDialog({
   form,
   setForm,
   busy,
+  variant = 'series',
   availableQuestionCount = null,
   poolLoading = false,
   questionCountTooHigh = false,
@@ -87,6 +88,7 @@ export function PackageSeriesFormDialog({
   toggleBoard,
   toggleSuite,
 }) {
+  const isQuiz = variant === 'quiz'
   const catalogSlugPreview = slugifyFromName(form.name)
 
   return (
@@ -105,10 +107,18 @@ export function PackageSeriesFormDialog({
         <CardHeader className="sticky top-0 z-10 flex flex-row items-start justify-between gap-4 space-y-0 border-b bg-card/95 px-6 py-5 backdrop-blur-sm">
           <div className="space-y-1.5 pr-2">
             <CardTitle id="pkg-dialog-title" className="text-xl">
-              {dialog.mode === 'create' ? 'New test series' : 'Edit test series'}
+              {dialog.mode === 'create'
+                ? isQuiz
+                  ? 'New quiz'
+                  : 'New test series'
+                : isQuiz
+                  ? 'Edit quiz'
+                  : 'Edit test series'}
             </CardTitle>
             <CardDescription className="text-sm leading-relaxed">
-              Configure catalog details and which questions are included in this series.
+              {isQuiz
+                ? 'Timed quiz — students pick difficulty when the test starts. Set subject, scope, and time limit here.'
+                : 'Configure catalog details and which questions are included in this series.'}
             </CardDescription>
           </div>
           <Button
@@ -170,64 +180,96 @@ export function PackageSeriesFormDialog({
             </FormSection>
 
             <FormSection
-              title="Test length"
-              description="How many questions and how long students have per attempt."
+              title={isQuiz ? 'Time limit' : 'Test length'}
+              description={
+                isQuiz
+                  ? 'Required. Students pick difficulty at test start — a focused question set is sampled for the timer.'
+                  : 'How many questions and how long students have per attempt.'
+              }
             >
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div
+                className={cn(
+                  'grid gap-4',
+                  isQuiz ? 'max-w-md' : 'sm:grid-cols-2',
+                )}
+              >
+                {!isQuiz ? (
+                  <div className="space-y-2">
+                    <Label htmlFor="pkg-question-count">Number of questions</Label>
+                    <Input
+                      id="pkg-question-count"
+                      type="number"
+                      min={1}
+                      max={
+                        availableQuestionCount != null && availableQuestionCount > 0
+                          ? availableQuestionCount
+                          : undefined
+                      }
+                      step={1}
+                      placeholder="All matching questions"
+                      value={form.questionCount}
+                      onChange={(e) => setForm((s) => ({ ...s, questionCount: e.target.value }))}
+                      disabled={busy}
+                      aria-invalid={questionCountTooHigh}
+                      className={questionCountTooHigh ? 'border-destructive' : undefined}
+                    />
+                    {form.subjectUuids.length === 0 ? (
+                      <p className="text-xs text-muted-foreground">
+                        Select at least one subject to see how many questions match your scope.
+                      </p>
+                    ) : poolLoading ? (
+                      <p className="text-xs text-muted-foreground">Counting matching questions…</p>
+                    ) : availableQuestionCount === 0 ? (
+                      <p className="text-xs text-destructive">
+                        No questions match the selected subjects, books, boards, licenses, and filters yet.
+                      </p>
+                    ) : availableQuestionCount != null ? (
+                      <p className="text-xs text-muted-foreground">
+                        {availableQuestionCount} question{availableQuestionCount === 1 ? '' : 's'}{' '}
+                        match this scope.
+                        {form.questionCount.trim()
+                          ? ' Each attempt randomly samples from that pool when a limit is set.'
+                          : ' Leave empty to use all of them.'}
+                      </p>
+                    ) : null}
+                    {questionCountTooHigh ? (
+                      <p className="text-xs text-destructive">
+                        {availableQuestionCount === 0
+                          ? 'Cannot set a question limit until at least one question matches this scope.'
+                          : `Limit cannot exceed ${availableQuestionCount} — only that many questions match.`}
+                      </p>
+                    ) : null}
+                  </div>
+                ) : form.subjectUuids.length > 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    {poolLoading
+                      ? 'Counting questions in scope…'
+                      : availableQuestionCount === 0
+                        ? 'No questions match this scope yet — add questions or broaden filters.'
+                        : `${availableQuestionCount} question${availableQuestionCount === 1 ? '' : 's'} in scope across all difficulty levels.`}
+                  </p>
+                ) : null}
                 <div className="space-y-2">
-                  <Label htmlFor="pkg-question-count">Number of questions</Label>
-                  <Input
-                    id="pkg-question-count"
-                    type="number"
-                    min={1}
-                    max={availableQuestionCount != null && availableQuestionCount > 0 ? availableQuestionCount : undefined}
-                    step={1}
-                    placeholder="All matching questions"
-                    value={form.questionCount}
-                    onChange={(e) => setForm((s) => ({ ...s, questionCount: e.target.value }))}
-                    disabled={busy}
-                    aria-invalid={questionCountTooHigh}
-                    className={questionCountTooHigh ? 'border-destructive' : undefined}
-                  />
-                  {form.subjectUuids.length === 0 ? (
-                    <p className="text-xs text-muted-foreground">
-                      Select at least one subject to see how many questions match your scope.
-                    </p>
-                  ) : poolLoading ? (
-                    <p className="text-xs text-muted-foreground">Counting matching questions…</p>
-                  ) : availableQuestionCount === 0 ? (
-                    <p className="text-xs text-destructive">
-                      No questions match the selected subjects, books, boards, licenses, and filters yet.
-                    </p>
-                  ) : availableQuestionCount != null ? (
-                    <p className="text-xs text-muted-foreground">
-                      {availableQuestionCount} question{availableQuestionCount === 1 ? '' : 's'}{' '}
-                      match this scope.
-                      {form.questionCount.trim()
-                        ? ' Each attempt randomly samples from that pool when a limit is set.'
-                        : ' Leave empty to use all of them.'}
-                    </p>
-                  ) : null}
-                  {questionCountTooHigh ? (
-                    <p className="text-xs text-destructive">
-                      {availableQuestionCount === 0
-                        ? 'Cannot set a question limit until at least one question matches this scope.'
-                        : `Limit cannot exceed ${availableQuestionCount} — only that many questions match.`}
-                    </p>
-                  ) : null}
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="pkg-time-limit">Time limit (minutes)</Label>
+                  <Label htmlFor="pkg-time-limit">
+                    Time limit (minutes)
+                    {isQuiz ? ' *' : ''}
+                  </Label>
                   <Input
                     id="pkg-time-limit"
                     type="number"
                     min={1}
                     step={1}
-                    placeholder="No limit"
+                    placeholder={isQuiz ? 'Required' : 'No limit'}
                     value={form.timeLimitMinutes}
                     onChange={(e) => setForm((s) => ({ ...s, timeLimitMinutes: e.target.value }))}
                     disabled={busy}
+                    required={isQuiz}
                   />
+                  {isQuiz ? (
+                    <p className="text-xs text-muted-foreground">
+                      Required — students choose difficulty when the quiz starts.
+                    </p>
+                  ) : null}
                 </div>
               </div>
             </FormSection>
@@ -281,34 +323,36 @@ export function PackageSeriesFormDialog({
                   </div>
                 </div>
 
-                <div className="space-y-3 rounded-lg border border-border/50 bg-background/60 p-3">
-                  <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Difficulty
-                  </Label>
-                  <div className="flex flex-wrap gap-2">
-                    {DIFFICULTY_OPTIONS.map((o) => (
-                      <label
-                        key={o.value}
-                        className={cn(
-                          'inline-flex cursor-pointer items-center rounded-full border px-3 py-1.5 text-sm transition-colors',
-                          form.difficultyFilter.includes(o.value)
-                            ? 'border-primary bg-primary/10 font-medium text-primary'
-                            : 'border-border bg-background hover:bg-muted/50',
-                          busy && 'cursor-not-allowed opacity-50',
-                        )}
-                      >
-                        <input
-                          type="checkbox"
-                          className="sr-only"
-                          checked={form.difficultyFilter.includes(o.value)}
-                          onChange={() => toggleDifficulty(o.value)}
-                          disabled={busy}
-                        />
-                        {o.label}
-                      </label>
-                    ))}
+                {!isQuiz ? (
+                  <div className="space-y-3 rounded-lg border border-border/50 bg-background/60 p-3">
+                    <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      Difficulty
+                    </Label>
+                    <div className="flex flex-wrap gap-2">
+                      {DIFFICULTY_OPTIONS.map((o) => (
+                        <label
+                          key={o.value}
+                          className={cn(
+                            'inline-flex cursor-pointer items-center rounded-full border px-3 py-1.5 text-sm transition-colors',
+                            form.difficultyFilter.includes(o.value)
+                              ? 'border-primary bg-primary/10 font-medium text-primary'
+                              : 'border-border bg-background hover:bg-muted/50',
+                            busy && 'cursor-not-allowed opacity-50',
+                          )}
+                        >
+                          <input
+                            type="checkbox"
+                            className="sr-only"
+                            checked={form.difficultyFilter.includes(o.value)}
+                            onChange={() => toggleDifficulty(o.value)}
+                            disabled={busy}
+                          />
+                          {o.label}
+                        </label>
+                      ))}
+                    </div>
                   </div>
-                </div>
+                ) : null}
 
                 <div className="space-y-3 rounded-lg border border-border/50 bg-background/60 p-3 lg:col-span-2">
                   <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">

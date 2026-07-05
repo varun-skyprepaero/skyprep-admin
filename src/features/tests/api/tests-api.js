@@ -156,8 +156,10 @@ export async function deleteTestQuestion(uuid) {
   return unwrap(res)
 }
 
-export async function fetchTestPackages() {
-  const res = await apiClient.get('/bank/packages')
+export async function fetchTestPackages(catalogKind) {
+  const res = await apiClient.get('/bank/packages', {
+    params: catalogKind ? { catalogKind } : undefined,
+  })
   return unwrap(res).packages
 }
 

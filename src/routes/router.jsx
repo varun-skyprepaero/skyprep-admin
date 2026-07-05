@@ -22,6 +22,7 @@ const TestsLessonsPage = lazyWithRetry(() => import('@/features/tests/pages/Less
 const TestsQuestionsPage = lazyWithRetry(() => import('@/features/tests/pages/QuestionsPage'))
 const TestsSuitesPage = lazyWithRetry(() => import('@/features/tests/pages/SuitesPage'))
 const TestsPackagesPage = lazyWithRetry(() => import('@/features/tests/pages/PackagesPage'))
+const QuizzesPage = lazyWithRetry(() => import('@/features/tests/pages/QuizzesPage'))
 const SubscriptionLayout = lazyWithRetry(() =>
   import('@/features/subscription/SubscriptionLayout'),
 )
@@ -114,6 +115,14 @@ export const router = createBrowserRouter([
             element: (
               <SuspensePage>
                 <RolesPermissionsPage />
+              </SuspensePage>
+            ),
+          },
+          {
+            path: '/quizzes',
+            element: (
+              <SuspensePage>
+                <QuizzesPage />
               </SuspensePage>
             ),
           },

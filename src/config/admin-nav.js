@@ -1,4 +1,5 @@
 import {
+  Brain,
   BookOpen,
   Calendar,
   ClipboardList,
@@ -36,6 +37,12 @@ export const adminNav = [
     canAccess: canAccessTestsSection,
   },
   {
+    name: 'Quizzes',
+    href: '/quizzes',
+    icon: Brain,
+    canAccess: canAccessTestsSection,
+  },
+  {
     name: 'Exams',
     href: '/exams',
     icon: GraduationCap,
@@ -65,6 +72,7 @@ export const adminNav = [
 export function getAdminNavTitle(pathname) {
   if (pathname === '/') return 'Dashboard'
   if (pathname.startsWith('/users')) return 'Users'
+  if (pathname.startsWith('/quizzes')) return 'Quizzes'
   if (pathname.startsWith('/exams')) return 'Exams'
   if (pathname.startsWith('/tests')) return 'Tests'
   if (pathname.startsWith('/subscription')) return 'Subscriptions'

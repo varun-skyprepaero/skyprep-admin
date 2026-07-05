@@ -1,9 +1,8 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { HelpCircle, Loader2, Plus } from 'lucide-react'
+import { Loader2, Plus } from 'lucide-react'
 import { DeleteConfirmDialog } from '@/components/ui/delete-confirm-dialog'
 import { PackageSeriesFormDialog } from '@/features/tests/pages/PackageSeriesFormDialog'
-import { TestSeriesStructureGuide } from '@/features/tests/pages/TestSeriesStructureGuide'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -36,16 +35,15 @@ import { handleApiError } from '@/lib/http/api-error'
 import { notifyError, notifySuccess } from '@/lib/notifications'
 import { slugifyFromName } from '@/lib/slug'
 
-const qkPkgs = ['tests', 'packages', 'TEST_SERIES']
+const qkQuizzes = ['tests', 'quizzes']
 const qkSubjects = ['tests', 'subjects']
 const qkBoards = ['tests', 'boards']
 const qkSuites = ['tests', 'suites']
 
-export default function TestsPackagesPage() {
+export default function QuizzesPage() {
   const queryClient = useQueryClient()
   const [search, setSearch] = useState('')
   const [dialog, setDialog] = useState(null)
-  const [guideOpen, setGuideOpen] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState(/** @type {{ uuid: string, label: string } | null} */ (null))
   const [form, setForm] = useState({
     slug: '',
@@ -54,13 +52,11 @@ export default function TestsPackagesPage() {
     isPublished: true,
     isDemo: false,
     subjectUuids: [],
-    difficultyFilter: [],
     questionTypeFilter: [],
     bookUuids: [],
     boardUuids: [],
     suiteUuids: [],
     timeLimitMinutes: '',
-    questionCount: '',
   })
 
   const { data: subjects = [] } = useQuery({
@@ -82,8 +78,8 @@ export default function TestsPackagesPage() {
   })
 
   const { data = [], isLoading, isError, error } = useQuery({
-    queryKey: qkPkgs,
-    queryFn: () => fetchTestPackages('TEST_SERIES'),
+    queryKey: qkQuizzes,
+    queryFn: () => fetchTestPackages('QUIZ'),
     enabled: true,
   })
 
@@ -101,20 +97,20 @@ export default function TestsPackagesPage() {
     form.bookUuids.join(','),
     form.boardUuids.join(','),
     form.suiteUuids.join(','),
-    form.difficultyFilter.join(','),
     form.questionTypeFilter.join(','),
+    'QUIZ',
   ].join('|')
 
   const { data: poolData, isFetching: poolLoading } = useQuery({
-    queryKey: ['tests', 'packages', 'pool-count', poolScopeKey],
+    queryKey: ['tests', 'quizzes', 'pool-count', poolScopeKey],
     queryFn: () =>
       fetchTestPackageQuestionPoolCount({
-        catalogKind: 'TEST_SERIES',
+        catalogKind: 'QUIZ',
         subjectUuids: form.subjectUuids,
         bookUuids: form.bookUuids,
         boardUuids: form.boardUuids,
         suiteUuids: form.suiteUuids,
-        difficultyFilter: form.difficultyFilter,
+        difficultyFilter: [],
         questionTypeFilter: form.questionTypeFilter,
       }),
     enabled: Boolean(dialog && form.subjectUuids.length > 0),
@@ -122,13 +118,6 @@ export default function TestsPackagesPage() {
 
   const availableQuestionCount =
     typeof poolData?.availableCount === 'number' ? poolData.availableCount : null
-  const requestedQuestionCount = form.questionCount.trim() ? Number(form.questionCount) : null
-  const questionCountTooHigh =
-    requestedQuestionCount != null &&
-    Number.isInteger(requestedQuestionCount) &&
-    requestedQuestionCount > 0 &&
-    availableQuestionCount != null &&
-    requestedQuestionCount > availableQuestionCount
 
   const filteredRows = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -156,9 +145,8 @@ export default function TestsPackagesPage() {
         description: form.description.trim() || null,
         isPublished: form.isPublished,
         isDemo: form.isDemo,
-        catalogKind: 'TEST_SERIES',
+        catalogKind: 'QUIZ',
         subjectUuids: form.subjectUuids,
-        difficultyFilter: form.difficultyFilter,
         questionTypeFilter: form.questionTypeFilter,
         bookUuids: form.bookUuids,
         boardUuids: form.boardUuids,
@@ -166,15 +154,15 @@ export default function TestsPackagesPage() {
         timeLimitMinutes: form.timeLimitMinutes.trim()
           ? Number(form.timeLimitMinutes)
           : null,
-        questionCount: form.questionCount.trim() ? Number(form.questionCount) : null,
+        questionCount: null,
       }),
     onSuccess: () => {
-      notifySuccess('Test series created')
-      void queryClient.invalidateQueries({ queryKey: qkPkgs })
+      notifySuccess('Quiz created')
+      void queryClient.invalidateQueries({ queryKey: qkQuizzes })
       setDialog(null)
     },
     onError: (err) => {
-      const { message } = handleApiError(err, 'Unable to create test series')
+      const { message } = handleApiError(err, 'Unable to create quiz')
       notifyError(message)
     },
   })
@@ -186,9 +174,8 @@ export default function TestsPackagesPage() {
         description: form.description.trim() || null,
         isPublished: form.isPublished,
         isDemo: form.isDemo,
-        catalogKind: 'TEST_SERIES',
+        catalogKind: 'QUIZ',
         subjectUuids: form.subjectUuids,
-        difficultyFilter: form.difficultyFilter,
         questionTypeFilter: form.questionTypeFilter,
         bookUuids: form.bookUuids,
         boardUuids: form.boardUuids,
@@ -196,11 +183,11 @@ export default function TestsPackagesPage() {
         timeLimitMinutes: form.timeLimitMinutes.trim()
           ? Number(form.timeLimitMinutes)
           : null,
-        questionCount: form.questionCount.trim() ? Number(form.questionCount) : null,
+        questionCount: null,
       }),
     onSuccess: () => {
-      notifySuccess('Test series updated')
-      void queryClient.invalidateQueries({ queryKey: qkPkgs })
+      notifySuccess('Quiz updated')
+      void queryClient.invalidateQueries({ queryKey: qkQuizzes })
       setDialog(null)
     },
     onError: (err) => {
@@ -212,8 +199,8 @@ export default function TestsPackagesPage() {
   const deleteMu = useMutation({
     mutationFn: (uuid) => deleteTestPackage(uuid),
     onSuccess: () => {
-      notifySuccess('Test series deleted')
-      void queryClient.invalidateQueries({ queryKey: qkPkgs })
+      notifySuccess('Quiz deleted')
+      void queryClient.invalidateQueries({ queryKey: qkQuizzes })
       setDeleteTarget(null)
     },
     onError: (err) => {
@@ -221,15 +208,6 @@ export default function TestsPackagesPage() {
       notifyError(message)
     },
   })
-
-  function toggleDifficulty(value) {
-    setForm((s) => {
-      const set = new Set(s.difficultyFilter)
-      if (set.has(value)) set.delete(value)
-      else set.add(value)
-      return { ...s, difficultyFilter: [...set] }
-    })
-  }
 
   function toggleQuestionType(value) {
     setForm((s) => {
@@ -283,15 +261,12 @@ export default function TestsPackagesPage() {
       description: '',
       isPublished: true,
       isDemo: false,
-      allowStudentDifficultySelection: false,
-    subjectUuids: [],
-      difficultyFilter: [],
+      subjectUuids: [],
       questionTypeFilter: [],
       bookUuids: [],
       boardUuids: [],
       suiteUuids: [],
       timeLimitMinutes: '',
-      questionCount: '',
     })
     setDialog({ mode: 'create' })
   }
@@ -304,7 +279,6 @@ export default function TestsPackagesPage() {
       isPublished: Boolean(row.isPublished),
       isDemo: Boolean(row.isDemo),
       subjectUuids: (row.subjects ?? []).map((s) => s.uuid),
-      difficultyFilter: row.difficultyFilter ?? [],
       questionTypeFilter: row.questionTypeFilter ?? [],
       bookUuids: (row.books ?? []).map((b) => b.uuid),
       boardUuids: (row.boards ?? []).map((b) => b.uuid),
@@ -313,20 +287,18 @@ export default function TestsPackagesPage() {
         row.timeLimitMinutes != null && row.timeLimitMinutes > 0
           ? String(row.timeLimitMinutes)
           : '',
-      questionCount:
-        row.questionCount != null && row.questionCount > 0 ? String(row.questionCount) : '',
     })
     setDialog({ mode: 'edit', uuid: row.uuid })
   }
 
   function submit(e) {
     e.preventDefault()
-    if (questionCountTooHigh) {
-      notifyError(
-        availableQuestionCount === 0
-          ? 'No questions match the selected scope. Add questions or broaden filters before setting a limit.'
-          : `Only ${availableQuestionCount} question${availableQuestionCount === 1 ? '' : 's'} match this scope. Lower the limit or add more questions.`,
-      )
+    if (!form.timeLimitMinutes.trim()) {
+      notifyError('Quizzes require a time limit.')
+      return
+    }
+    if (availableQuestionCount === 0) {
+      notifyError('No questions match this scope yet. Add questions or broaden filters.')
       return
     }
     if (dialog?.mode === 'create') {
@@ -346,23 +318,12 @@ export default function TestsPackagesPage() {
         <CardHeader className="pb-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="space-y-1.5">
-              <CardTitle>Test series</CardTitle>
+              <CardTitle>Quizzes</CardTitle>
               <CardDescription>
-                Configure test series in the student catalog. Mark series as free demos for students
-                without a subscription, or leave them subscription-only. Scope questions by subjects,
-                boards, licenses, difficulty, type, and books.
+                Timed quizzes for students — they pick difficulty when the test starts. Include the{' '}
+                <strong className="font-medium text-foreground">Quiz</strong> entitlement in subscription plans to sell access.
               </CardDescription>
             </div>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="shrink-0"
-              onClick={() => setGuideOpen(true)}
-            >
-              <HelpCircle className="size-4" aria-hidden />
-              How it works
-            </Button>
           </div>
         </CardHeader>
         <DataTable>
@@ -375,7 +336,7 @@ export default function TestsPackagesPage() {
           >
             <Button type="button" size="sm" onClick={openCreate}>
               <Plus className="size-4" aria-hidden />
-              Add test series
+              Add quiz
             </Button>
           </DataTableToolbar>
           <DataTableContent>
@@ -394,7 +355,7 @@ export default function TestsPackagesPage() {
                       <th className="px-4 py-3 font-medium">Boards</th>
                       <th className="px-4 py-3 font-medium">Licenses</th>
                       <th className="px-4 py-3 font-medium">Slug</th>
-                      <th className="px-4 py-3 font-medium">Questions</th>
+                      <th className="px-4 py-3 font-medium">Difficulty</th>
                       <th className="px-4 py-3 font-medium">Time limit</th>
                       <th className="px-4 py-3 font-medium">Subjects</th>
                       <th className="px-4 py-3 font-medium">Published</th>
@@ -407,7 +368,7 @@ export default function TestsPackagesPage() {
                       <tr>
                         <td colSpan={10} className="px-4 py-8 text-center text-muted-foreground">
                           {data.length === 0
-                            ? 'No test series yet.'
+                            ? 'No quizzes yet.'
                             : 'No results match your search.'}
                         </td>
                       </tr>
@@ -422,11 +383,7 @@ export default function TestsPackagesPage() {
                             {(row.suites ?? []).map((s) => s.name).join(', ') || '—'}
                           </td>
                           <td className="px-4 py-3 font-mono text-xs">{row.slug}</td>
-                          <td className="px-4 py-3 text-xs tabular-nums">
-                            {row.questionCount != null && row.questionCount > 0
-                              ? row.questionCount
-                              : 'All'}
-                          </td>
+                          <td className="px-4 py-3 text-xs">At test start</td>
                           <td className="px-4 py-3 text-xs">
                             {row.timeLimitMinutes != null && row.timeLimitMinutes > 0
                               ? `${row.timeLimitMinutes} min`
@@ -472,14 +429,14 @@ export default function TestsPackagesPage() {
 
       {dialog ? (
         <PackageSeriesFormDialog
-          variant="series"
+          variant="quiz"
           dialog={dialog}
           form={form}
           setForm={setForm}
           busy={createMu.isPending || updateMu.isPending}
           availableQuestionCount={availableQuestionCount}
           poolLoading={poolLoading}
-          questionCountTooHigh={questionCountTooHigh}
+          questionCountTooHigh={false}
           onClose={() => setDialog(null)}
           onSubmit={submit}
           subjects={subjects}
@@ -487,7 +444,6 @@ export default function TestsPackagesPage() {
           suites={suites}
           booksForPackage={booksForPackage}
           toggleSubject={toggleSubject}
-          toggleDifficulty={toggleDifficulty}
           toggleQuestionType={toggleQuestionType}
           toggleBook={toggleBook}
           toggleBoard={toggleBoard}
@@ -497,7 +453,7 @@ export default function TestsPackagesPage() {
 
       <DeleteConfirmDialog
         open={Boolean(deleteTarget)}
-        title="Delete test series?"
+        title="Delete quiz?"
         description={
           deleteTarget ? (
             <>
@@ -511,7 +467,6 @@ export default function TestsPackagesPage() {
         onConfirm={() => deleteTarget && deleteMu.mutate(deleteTarget.uuid)}
       />
 
-      <TestSeriesStructureGuide open={guideOpen} onClose={() => setGuideOpen(false)} />
     </div>
   )
 }
