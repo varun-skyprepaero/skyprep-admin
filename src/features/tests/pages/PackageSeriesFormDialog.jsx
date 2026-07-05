@@ -15,6 +15,7 @@ import {
 } from '@/features/tests/constants'
 import { slugifyFromName } from '@/lib/slug'
 import { cn } from '@/lib/utils'
+import { CoverImageField } from '@/features/tests/components/CoverImageField'
 
 const selectClass =
   'flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50'
@@ -165,6 +166,23 @@ export function PackageSeriesFormDialog({
                     <p className="font-mono text-sm">{form.slug}</p>
                   </div>
                 )}
+              </div>
+              <div className="mt-4">
+                <CoverImageField
+                  value={form.coverImageUrl}
+                  mediaUuid={form.coverMediaUuid}
+                  purpose={isQuiz ? 'quiz_cover' : 'test_series_cover'}
+                  entityUuid={dialog.mode === 'edit' ? dialog.uuid : null}
+                  entityType={isQuiz ? 'quiz' : 'test-series'}
+                  disabled={busy}
+                  onChange={({ coverImageUrl, coverMediaUuid }) =>
+                    setForm((s) => ({
+                      ...s,
+                      coverImageUrl,
+                      coverMediaUuid,
+                    }))
+                  }
+                />
               </div>
               <div className="mt-4 space-y-2">
                 <Label htmlFor="pkg-desc">Description</Label>

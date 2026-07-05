@@ -57,6 +57,8 @@ export default function QuizzesPage() {
     boardUuids: [],
     suiteUuids: [],
     timeLimitMinutes: '',
+    coverImageUrl: null,
+    coverMediaUuid: null,
   })
 
   const { data: subjects = [] } = useQuery({
@@ -155,6 +157,8 @@ export default function QuizzesPage() {
           ? Number(form.timeLimitMinutes)
           : null,
         questionCount: null,
+        coverImageUrl: form.coverImageUrl || null,
+        coverMediaUuid: form.coverMediaUuid || null,
       }),
     onSuccess: () => {
       notifySuccess('Quiz created')
@@ -184,6 +188,8 @@ export default function QuizzesPage() {
           ? Number(form.timeLimitMinutes)
           : null,
         questionCount: null,
+        coverImageUrl: form.coverImageUrl || null,
+        coverMediaUuid: form.coverMediaUuid || null,
       }),
     onSuccess: () => {
       notifySuccess('Quiz updated')
@@ -267,6 +273,8 @@ export default function QuizzesPage() {
       boardUuids: [],
       suiteUuids: [],
       timeLimitMinutes: '',
+      coverImageUrl: null,
+      coverMediaUuid: null,
     })
     setDialog({ mode: 'create' })
   }
@@ -287,6 +295,8 @@ export default function QuizzesPage() {
         row.timeLimitMinutes != null && row.timeLimitMinutes > 0
           ? String(row.timeLimitMinutes)
           : '',
+      coverImageUrl: row.coverImageUrl ?? null,
+      coverMediaUuid: row.coverMediaUuid ?? null,
     })
     setDialog({ mode: 'edit', uuid: row.uuid })
   }

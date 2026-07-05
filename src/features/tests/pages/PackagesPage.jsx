@@ -61,6 +61,8 @@ export default function TestsPackagesPage() {
     suiteUuids: [],
     timeLimitMinutes: '',
     questionCount: '',
+    coverImageUrl: null,
+    coverMediaUuid: null,
   })
 
   const { data: subjects = [] } = useQuery({
@@ -167,6 +169,8 @@ export default function TestsPackagesPage() {
           ? Number(form.timeLimitMinutes)
           : null,
         questionCount: form.questionCount.trim() ? Number(form.questionCount) : null,
+        coverImageUrl: form.coverImageUrl || null,
+        coverMediaUuid: form.coverMediaUuid || null,
       }),
     onSuccess: () => {
       notifySuccess('Test series created')
@@ -197,6 +201,8 @@ export default function TestsPackagesPage() {
           ? Number(form.timeLimitMinutes)
           : null,
         questionCount: form.questionCount.trim() ? Number(form.questionCount) : null,
+        coverImageUrl: form.coverImageUrl || null,
+        coverMediaUuid: form.coverMediaUuid || null,
       }),
     onSuccess: () => {
       notifySuccess('Test series updated')
@@ -292,6 +298,8 @@ export default function TestsPackagesPage() {
       suiteUuids: [],
       timeLimitMinutes: '',
       questionCount: '',
+      coverImageUrl: null,
+      coverMediaUuid: null,
     })
     setDialog({ mode: 'create' })
   }
@@ -315,6 +323,8 @@ export default function TestsPackagesPage() {
           : '',
       questionCount:
         row.questionCount != null && row.questionCount > 0 ? String(row.questionCount) : '',
+      coverImageUrl: row.coverImageUrl ?? null,
+      coverMediaUuid: row.coverMediaUuid ?? null,
     })
     setDialog({ mode: 'edit', uuid: row.uuid })
   }
