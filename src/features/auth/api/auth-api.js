@@ -10,7 +10,10 @@ export { toAuthSession } from '@/features/auth/lib/to-auth-session'
  */
 export async function login(payload) {
   try {
-    const { data } = await apiClient.post(AUTH_ENDPOINTS.login, payload)
+    const { data } = await apiClient.post(AUTH_ENDPOINTS.login, {
+      email: payload.email.trim().toLowerCase(),
+      password: payload.password,
+    })
     return data
   } catch (error) {
     throw toApiClientError(error)

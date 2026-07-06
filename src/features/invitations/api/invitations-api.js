@@ -7,7 +7,10 @@ import { toApiClientError } from '@/lib/http/api-error'
  */
 export async function createInvitation(payload) {
   try {
-    const { data } = await apiClient.post(INVITATION_ENDPOINTS.create, payload)
+    const { data } = await apiClient.post(INVITATION_ENDPOINTS.create, {
+      ...payload,
+      email: payload.email.trim().toLowerCase(),
+    })
     return data
   } catch (error) {
     throw toApiClientError(error)
