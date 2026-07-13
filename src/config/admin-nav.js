@@ -8,6 +8,7 @@ import {
   GraduationCap,
   HelpCircle,
   KeyRound,
+  Layers,
   LayoutDashboard,
   Package,
   UserCog,
@@ -19,6 +20,7 @@ import {
   canAccessRolesPermissionsSection,
   canAccessSubscriptionSection,
   canAccessTestsSection,
+  canAccessTrainingProgramsSection,
   canAccessUsersSection,
 } from '@/features/auth/lib/admin-section-access'
 
@@ -62,7 +64,12 @@ export const adminNav = [
     canAccess: canAccessRolesPermissionsSection,
   },
   { name: 'Calendar', href: '/calendar', icon: Calendar, disabled: true },
-  { name: 'Focus One', href: '/focus-one', icon: Users, disabled: true },
+  {
+    name: 'Programs',
+    href: '/programs',
+    icon: Layers,
+    canAccess: canAccessTrainingProgramsSection,
+  },
   { name: 'Teachers', href: '/teachers', icon: UserCog, disabled: true },
   { name: 'Subjects', href: '/subjects', icon: BookOpen, disabled: true },
   { name: 'Chapters', href: '/chapters', icon: FileText, disabled: true },
@@ -78,6 +85,8 @@ export function getAdminNavTitle(pathname) {
   if (pathname.startsWith('/subscription')) return 'Subscriptions'
   if (pathname.startsWith('/credits')) return 'Credits'
   if (pathname.startsWith('/roles-permissions')) return 'Roles & permissions'
+  if (pathname.startsWith('/programs')) return 'Programs'
+  if (pathname.startsWith('/focus-one')) return 'Programs'
   const item = adminNav.find(
     (nav) => !nav.disabled && nav.href !== '/' && pathname.startsWith(nav.href),
   )

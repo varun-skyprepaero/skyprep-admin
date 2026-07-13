@@ -1,14 +1,8 @@
-import { Loader2, X } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Modal, ModalBody, ModalFooter, ModalHeader } from '@/components/ui/modal'
 import {
   DIFFICULTY_OPTIONS,
   QUESTION_TYPE_OPTIONS,
@@ -93,50 +87,35 @@ export function PackageSeriesFormDialog({
   const catalogSlugPreview = slugifyFromName(form.name)
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex min-h-0 items-end justify-center bg-background/80 p-4 backdrop-blur-sm sm:items-center"
-      role="presentation"
-      onClick={() => !busy && onClose()}
+    <Modal
+      open
+      onClose={onClose}
+      size="xl"
+      closeDisabled={busy}
+      aria-labelledby="pkg-dialog-title"
     >
-      <Card
-        className="relative z-10 w-full max-w-3xl max-h-[90vh] overflow-y-auto overscroll-contain p-0 shadow-xl"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="pkg-dialog-title"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <CardHeader className="sticky top-0 z-10 flex flex-row items-start justify-between gap-4 space-y-0 border-b bg-card/95 px-6 py-5 backdrop-blur-sm">
-          <div className="space-y-1.5 pr-2">
-            <CardTitle id="pkg-dialog-title" className="text-xl">
-              {dialog.mode === 'create'
-                ? isQuiz
-                  ? 'New quiz'
-                  : 'New test series'
-                : isQuiz
-                  ? 'Edit quiz'
-                  : 'Edit test series'}
-            </CardTitle>
-            <CardDescription className="text-sm leading-relaxed">
-              {isQuiz
-                ? 'Timed quiz — students pick difficulty when the test starts. Set subject, scope, and time limit here.'
-                : 'Configure catalog details and which questions are included in this series.'}
-            </CardDescription>
-          </div>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="shrink-0"
-            disabled={busy}
-            onClick={onClose}
-            aria-label="Close"
-          >
-            <X className="size-4" aria-hidden />
-          </Button>
-        </CardHeader>
+      <ModalHeader
+        title={
+          dialog.mode === 'create'
+            ? isQuiz
+              ? 'New quiz'
+              : 'New test series'
+            : isQuiz
+              ? 'Edit quiz'
+              : 'Edit test series'
+        }
+        description={
+          isQuiz
+            ? 'Timed quiz — students pick difficulty when the test starts. Set subject, scope, and time limit here.'
+            : 'Configure catalog details and which questions are included in this series.'
+        }
+        titleId="pkg-dialog-title"
+        onClose={onClose}
+        closeDisabled={busy}
+      />
 
-        <form onSubmit={onSubmit}>
-          <CardContent className="px-6 py-5">
+        <form onSubmit={onSubmit} className="flex min-h-0 flex-1 flex-col">
+          <ModalBody className="space-y-5">
             <div className="space-y-5">
             <FormSection title="Basics" description="How this series appears in the student catalog.">
               <div className="space-y-2">
@@ -462,9 +441,9 @@ export function PackageSeriesFormDialog({
             </FormSection>
 
             </div>
-          </CardContent>
+          </ModalBody>
 
-          <div className="sticky bottom-0 z-10 flex justify-end gap-2 border-t bg-card/95 px-6 py-4 backdrop-blur-sm">
+          <ModalFooter>
             <Button type="button" variant="outline" onClick={onClose} disabled={busy}>
               Cancel
             </Button>
@@ -472,9 +451,8 @@ export function PackageSeriesFormDialog({
               {busy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
               Save
             </Button>
-          </div>
+          </ModalFooter>
         </form>
-      </Card>
-    </div>
+    </Modal>
   )
 }

@@ -471,7 +471,7 @@ export default function ExamsDemoPage() {
           onClick={() => setCreateOpen(false)}
         >
           <Card
-            className="relative z-10 w-full max-w-md shadow-lg"
+            className="relative z-10 max-h-[min(92vh,100dvh-2rem)] w-full max-w-md overflow-y-auto overscroll-contain shadow-lg"
             role="dialog"
             aria-modal="true"
             aria-labelledby="create-exam-title"

@@ -941,7 +941,7 @@ export default function UsersPage() {
           onClick={() => !adminUpdateMutation.isPending && setEditUser(null)}
         >
           <Card
-            className="relative z-10 w-full max-w-lg shadow-lg"
+            className="relative z-10 max-h-[min(92vh,100dvh-2rem)] w-full max-w-lg overflow-y-auto overscroll-contain shadow-lg"
             role="dialog"
             aria-modal="true"
             aria-labelledby="edit-user-title"
@@ -1057,7 +1057,7 @@ export default function UsersPage() {
           onClick={closeCancelInviteConfirm}
         >
           <Card
-            className="relative z-10 w-full max-w-md shadow-lg"
+            className="relative z-10 max-h-[min(92vh,100dvh-2rem)] w-full max-w-md overflow-y-auto overscroll-contain shadow-lg"
             role="dialog"
             aria-modal="true"
             aria-labelledby="cancel-invite-title"

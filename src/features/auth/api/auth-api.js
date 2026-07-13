@@ -93,6 +93,7 @@ export async function getInvitePreview(token) {
  *   password: string,
  *   firstName: string,
  *   lastName?: string,
+ *   gender: 'MALE' | 'FEMALE' | 'OTHER' | 'PREFER_NOT_TO_SAY',
  *   timezone: string,
  *   countryCode?: string,
  *   phoneNumber?: string,

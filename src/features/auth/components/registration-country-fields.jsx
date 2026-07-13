@@ -114,10 +114,6 @@ export function RegistrationCountryFields({
         </div>
         {errors.country ? (
           <p className="text-sm text-destructive">{errors.country}</p>
-        ) : selectedCountry ? (
-          <p className="text-xs text-muted-foreground">
-            Used for regional pricing and your profile.
-          </p>
         ) : (
           <p className="text-xs text-muted-foreground">
             Choose your country or use your location to fill it automatically.
