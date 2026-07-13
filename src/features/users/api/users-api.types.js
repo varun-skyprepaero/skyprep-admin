@@ -6,6 +6,7 @@
  *   lastName?: string | null
  *   role?: { uuid?: string, name?: string } | null
  *   isActive?: boolean
+ *   timezone?: string | null
  *   createdAt?: string
  *   registrationSource?: 'SELF_REGISTERED' | 'INVITED' | 'ADMIN_CREATED' | null
  * }} AdminUserRow

@@ -37,6 +37,18 @@ const SubscriptionIndexRedirect = lazyWithRetry(() =>
 const RolesPermissionsPage = lazyWithRetry(() =>
   import('@/features/roles-permissions/pages/RolesPermissionsPage'),
 )
+const TrainingProgramsLayout = lazyWithRetry(() =>
+  import('@/features/training/TrainingProgramsLayout'),
+)
+const ProgramsCatalogPage = lazyWithRetry(() =>
+  import('@/features/training/pages/ProgramsCatalogPage'),
+)
+const ProgramTypeEnrollmentsPage = lazyWithRetry(() =>
+  import('@/features/training/pages/ProgramTypeEnrollmentsPage'),
+)
+const TrainingProgramsIndexRedirect = lazyWithRetry(() =>
+  import('@/features/training/TrainingProgramsIndexRedirect'),
+)
 const StaffLoginPage = lazyWithRetry(() => import('@/features/auth/pages/StaffLoginPage'))
 
 export const router = createBrowserRouter([
@@ -251,6 +263,37 @@ export const router = createBrowserRouter([
                 ),
               },
             ],
+          },
+          {
+            path: '/programs',
+            element: (
+              <SuspensePage>
+                <TrainingProgramsLayout />
+              </SuspensePage>
+            ),
+            children: [
+              { index: true, element: <TrainingProgramsIndexRedirect /> },
+              {
+                path: 'catalog',
+                element: (
+                  <SuspensePage>
+                    <ProgramsCatalogPage />
+                  </SuspensePage>
+                ),
+              },
+              {
+                path: ':programTypeSlug',
+                element: (
+                  <SuspensePage>
+                    <ProgramTypeEnrollmentsPage />
+                  </SuspensePage>
+                ),
+              },
+            ],
+          },
+          {
+            path: '/focus-one',
+            element: <Navigate to="/programs/focus-one" replace />,
           },
         ],
       },

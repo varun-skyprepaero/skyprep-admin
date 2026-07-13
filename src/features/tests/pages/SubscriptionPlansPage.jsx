@@ -13,6 +13,7 @@ import {
 import { DataTablePagination } from '@/components/ui/data-table'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Modal, ModalBody, ModalFooter, ModalHeader } from '@/components/ui/modal'
 import { usePaginatedRows } from '@/hooks/use-paginated-rows'
 import {
   createSubscriptionPlan,
@@ -590,17 +591,23 @@ export default function SubscriptionPlansPage() {
       </Card>
 
       {dialog ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm">
-          <Card className="w-full max-w-md">
-            <CardHeader>
-              <CardTitle>
-                {dialog.mode === 'create'
-                  ? `New ${form.interval === 'year' ? 'yearly' : 'monthly'} plan`
-                  : 'Edit subscription plan'}
-              </CardTitle>
-            </CardHeader>
-            <form onSubmit={submit}>
-              <CardContent className="space-y-4">
+      <Modal
+        open
+        onClose={() => !busy && setDialog(null)}
+        size="sm"
+        closeDisabled={busy}
+      >
+        <ModalHeader
+          title={
+            dialog.mode === 'create'
+              ? `New ${form.interval === 'year' ? 'yearly' : 'monthly'} plan`
+              : 'Edit subscription plan'
+          }
+          onClose={() => setDialog(null)}
+          closeDisabled={busy}
+        />
+        <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col">
+          <ModalBody className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="plan-label">Label</Label>
                   <Input
@@ -849,19 +856,18 @@ export default function SubscriptionPlansPage() {
                     ) : null}
                   </fieldset>
                 ) : null}
-              </CardContent>
-              <div className="flex justify-end gap-2 border-t p-4">
-                <Button type="button" variant="outline" onClick={() => setDialog(null)} disabled={busy}>
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={busy || form.entitlements.length === 0}>
-                  {busy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
-                  Save
-                </Button>
-              </div>
-            </form>
-          </Card>
-        </div>
+          </ModalBody>
+          <ModalFooter>
+            <Button type="button" variant="outline" onClick={() => setDialog(null)} disabled={busy}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={busy || form.entitlements.length === 0}>
+              {busy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
+              Save
+            </Button>
+          </ModalFooter>
+        </form>
+      </Modal>
       ) : null}
 
       <ActionConfirmDialog

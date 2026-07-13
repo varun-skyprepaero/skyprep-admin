@@ -1,13 +1,6 @@
-import { Loader2, X } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card'
-import { cn } from '@/lib/utils'
+import { Modal, ModalBody, ModalFooter, ModalHeader } from '@/components/ui/modal'
 
 /**
  * @param {{
@@ -37,64 +30,41 @@ export function ActionConfirmDialog({
   onConfirm,
   onClose,
 }) {
-  if (!open) return null
-
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-background/80 p-4 backdrop-blur-sm sm:items-center"
-      role="presentation"
-      onClick={() => !loading && onClose()}
+    <Modal
+      open={open}
+      onClose={onClose}
+      size="md"
+      role="alertdialog"
+      closeDisabled={loading}
+      closeOnOverlayClick={!loading}
+      aria-labelledby="action-confirm-title"
+      aria-describedby={description ? 'action-confirm-description' : undefined}
     >
-      <Card
-        className="relative z-10 w-full max-w-lg shadow-lg"
-        role="alertdialog"
-        aria-modal="true"
-        aria-labelledby="action-confirm-title"
-        aria-describedby={description ? 'action-confirm-description' : undefined}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <CardHeader>
-          <div className="flex items-start justify-between gap-4">
-            <div className="space-y-1">
-              <CardTitle id="action-confirm-title">{title}</CardTitle>
-              {description ? (
-                <CardDescription id="action-confirm-description" className="text-sm leading-relaxed">
-                  {description}
-                </CardDescription>
-              ) : null}
-            </div>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="shrink-0"
-              onClick={onClose}
-              aria-label="Close"
-              disabled={loading}
-            >
-              <X className="size-4" aria-hidden />
-            </Button>
-          </div>
-        </CardHeader>
-        {children ? <CardContent className="space-y-4 pt-0">{children}</CardContent> : null}
-        <CardContent className={cn(children ? 'border-t pt-4' : '')}>
-          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-            <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
-              {cancelLabel}
-            </Button>
-            <Button
-              type="button"
-              variant={confirmVariant}
-              onClick={onConfirm}
-              disabled={loading || confirmDisabled}
-            >
-              {loading ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
-              {confirmLabel}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+      <ModalHeader
+        title={title}
+        description={description}
+        titleId="action-confirm-title"
+        descriptionId="action-confirm-description"
+        onClose={onClose}
+        closeDisabled={loading}
+      />
+      {children ? <ModalBody className="space-y-4">{children}</ModalBody> : null}
+      <ModalFooter>
+        <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
+          {cancelLabel}
+        </Button>
+        <Button
+          type="button"
+          variant={confirmVariant}
+          onClick={onConfirm}
+          disabled={loading || confirmDisabled}
+        >
+          {loading ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
+          {confirmLabel}
+        </Button>
+      </ModalFooter>
+    </Modal>
   )
 }
 

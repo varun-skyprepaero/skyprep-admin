@@ -22,13 +22,14 @@ import { isClassroomSignupInvite } from '@/features/auth/lib/is-classroom-signup
 import { SUPER_ADMIN_ROLE_NAME } from '@/features/invitations/constants'
 import { TimezoneField } from '@/features/auth/components/timezone-field'
 import { getPasswordValidationError } from '@/features/auth/lib/password-policy'
+import { GENDER_OPTIONS, normalizeGenderValue } from '@/features/auth/constants/gender'
 import { env } from '@/config/env'
 import { getBrowserTimezone, isValidIANATimezone, normalizeTimezone } from '@/lib/datetime/timezone-utils'
 import { resolveRegistrationContact, countrySelectionFromIso } from '@/lib/phone/country-selection'
 import { handleApiError } from '@/lib/http/api-error'
 import { notifySuccess } from '@/lib/notifications'
 import { useAuthStore } from '@/stores/auth-store'
-import { Eye, EyeOff, Loader2 } from 'lucide-react'
+import { ChevronDown, Eye, EyeOff, Loader2 } from 'lucide-react'
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
@@ -37,6 +38,7 @@ function validateInviteForm(form) {
   if (!form.firstName.trim()) errors.firstName = 'First name is required'
   if (!form.email.trim()) errors.email = 'Email is required'
   else if (!EMAIL_RE.test(form.email.trim())) errors.email = 'Enter a valid email address'
+  if (!normalizeGenderValue(form.gender)) errors.gender = 'Gender is required'
   if (!form.password) errors.password = 'Password is required'
   else {
     const passwordError = getPasswordValidationError(form.password)
@@ -69,6 +71,7 @@ export default function RegisterPage() {
   const [form, setForm] = useState(() => ({
     firstName: '',
     lastName: '',
+    gender: '',
     email: '',
     password: '',
     timezone: getBrowserTimezone(),
@@ -165,6 +168,7 @@ export default function RegisterPage() {
       inviteToken,
       firstName: form.firstName.trim(),
       lastName: form.lastName.trim() || undefined,
+      gender: form.gender,
       password: form.password,
       timezone: normalizeTimezone(form.timezone) ?? '',
       countryCode: contact.countryCode,
@@ -280,6 +284,32 @@ export default function RegisterPage() {
                 disabled={mutation.isPending}
               />
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="gender">Gender</Label>
+            <div className="relative">
+              <select
+                id="gender"
+                value={form.gender}
+                onChange={(e) => setForm((prev) => ({ ...prev, gender: e.target.value }))}
+                aria-invalid={Boolean(errors.gender)}
+                disabled={mutation.isPending}
+                className="flex h-10 w-full appearance-none rounded-md border border-input bg-background px-3 py-2 pr-10 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <option value="">Select gender</option>
+                {GENDER_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown
+                className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+                aria-hidden
+              />
+            </div>
+            {errors.gender ? <p className="text-sm text-destructive">{errors.gender}</p> : null}
           </div>
 
           <div className="space-y-2">

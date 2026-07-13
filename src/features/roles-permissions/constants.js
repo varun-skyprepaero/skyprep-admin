@@ -71,6 +71,18 @@ export const ADMIN_PERMISSION_SECTIONS = [
     ],
   },
   {
+    id: 'training',
+    label: 'Training',
+    screens: [
+      {
+        id: 'training_programs',
+        label: 'Programs catalog',
+        actions: ['view', 'create', 'edit', 'delete'],
+      },
+      { id: 'focus_one', label: 'Focus One', actions: ['view', 'create', 'edit', 'delete'] },
+    ],
+  },
+  {
     id: 'access_control',
     label: 'Access control',
     screens: [
@@ -86,7 +98,6 @@ export const ADMIN_PERMISSION_SECTIONS = [
     label: 'Planned modules',
     screens: [
       { id: 'calendar', label: 'Calendar', actions: ['view', 'create', 'edit', 'delete'] },
-      { id: 'focus_one', label: 'Focus One', actions: ['view', 'create', 'edit', 'delete'] },
       { id: 'teachers', label: 'Teachers', actions: ['view', 'create', 'edit', 'delete'] },
       { id: 'subjects_legacy', label: 'Subjects (legacy)', actions: ['view', 'create', 'edit', 'delete'] },
       { id: 'chapters', label: 'Chapters', actions: ['view', 'create', 'edit', 'delete'] },
