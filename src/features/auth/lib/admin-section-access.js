@@ -102,6 +102,31 @@ export function canAccessSubscriptionSection(user, matrix) {
  * @param {Parameters<typeof hasAdminPortalRole>[0]} user
  * @param {import('@/features/roles-permissions/api/permissions-api.types').PermissionMatrix | null | undefined} matrix
  */
+export function canAccessFocusOneSection(user, matrix) {
+  return hasPermission(matrix, 'focus_one', 'view', user)
+}
+
+/**
+ * @param {Parameters<typeof hasAdminPortalRole>[0]} user
+ * @param {import('@/features/roles-permissions/api/permissions-api.types').PermissionMatrix | null | undefined} matrix
+ */
+export function canAccessTrainingProgramsSection(user, matrix) {
+  if (isSuperAdmin(user)) return true
+  return (
+    hasPermission(matrix, 'training_programs', 'view', user) ||
+    hasPermission(matrix, 'focus_one', 'view', user)
+  )
+}
+
+/** @param {string} screenId */
+export function canViewTrainingProgramScreen(user, matrix, screenId) {
+  return hasPermission(matrix, screenId, 'view', user)
+}
+
+/**
+ * @param {Parameters<typeof hasAdminPortalRole>[0]} user
+ * @param {import('@/features/roles-permissions/api/permissions-api.types').PermissionMatrix | null | undefined} matrix
+ */
 export function canAccessRolesPermissionsSection(user, matrix) {
   return hasPermission(matrix, 'roles.permissions', 'view', user)
 }
