@@ -132,6 +132,26 @@ export function canAccessRolesPermissionsSection(user, matrix) {
 }
 
 /**
+ * Review section is visible to reviewers (review.queue view) and to data-entry
+ * users, who use it to see items flagged for their correction.
+ * @param {Parameters<typeof hasAdminPortalRole>[0]} user
+ * @param {import('@/features/roles-permissions/api/permissions-api.types').PermissionMatrix | null | undefined} matrix
+ */
+export function canAccessReviewSection(user, matrix) {
+  if (isSuperAdmin(user)) return true
+  if (isDataEntryUser(user)) return true
+  return hasPermission(matrix, 'review.queue', 'view', user)
+}
+
+/**
+ * @param {Parameters<typeof hasAdminPortalRole>[0]} user
+ * @param {import('@/features/roles-permissions/api/permissions-api.types').PermissionMatrix | null | undefined} matrix
+ */
+export function canEditDataEntryAuditors(user, matrix) {
+  return hasPermission(matrix, 'users.data_entry_peers', 'edit', user)
+}
+
+/**
  * @param {Parameters<typeof hasAdminPortalRole>[0]} viewer
  * @param {string | null | undefined} targetRoleName
  * @param {import('@/features/roles-permissions/api/permissions-api.types').PermissionMatrix | null | undefined} matrix

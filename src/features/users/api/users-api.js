@@ -28,6 +28,35 @@ export async function adminUpdateUser(userUuid, payload) {
 }
 
 /**
+ * Staff eligible to audit data-entry work (Admins and Super Admins).
+ * @returns {Promise<Array<import('./users-api.types').AdminUserRow>>}
+ */
+export async function fetchAuditors() {
+  try {
+    const { data } = await apiClient.get(USER_ENDPOINTS.auditors)
+    return Array.isArray(data?.data) ? data.data : []
+  } catch (error) {
+    throw toApiClientError(error)
+  }
+}
+
+/**
+ * Assign (or clear, when auditorUuid is null) the admin who audits a data-entry user.
+ * @param {string} userUuid
+ * @param {string | null} auditorUuid
+ */
+export async function setUserAuditor(userUuid, auditorUuid) {
+  try {
+    const { data } = await apiClient.patch(USER_ENDPOINTS.setAuditor(userUuid), {
+      auditorUuid: auditorUuid || null,
+    })
+    return data
+  } catch (error) {
+    throw toApiClientError(error)
+  }
+}
+
+/**
  * @param {string} userUuid
  * @returns {Promise<{ signInUrl: string, classroomUrl: string, targetApp?: 'classroom' | 'admin', targetEmail?: string }>}
  */

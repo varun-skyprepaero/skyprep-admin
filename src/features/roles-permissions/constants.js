@@ -58,6 +58,18 @@ export const ADMIN_PERMISSION_SECTIONS = [
     ],
   },
   {
+    id: 'review',
+    label: 'Data-entry review',
+    screens: [
+      {
+        id: 'review.queue',
+        label: 'Review queue',
+        description: 'Audit data-entry work and flag items for correction.',
+        actions: ['view', 'edit'],
+      },
+    ],
+  },
+  {
     id: 'subscription',
     label: 'Subscriptions',
     screens: [

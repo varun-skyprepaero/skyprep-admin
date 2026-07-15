@@ -141,6 +141,11 @@ export async function fetchTestQuestions(params = {}) {
   return unwrap(res).questions
 }
 
+export async function fetchTestQuestion(uuid) {
+  const res = await apiClient.get(`/bank/questions/${uuid}`)
+  return unwrap(res).question
+}
+
 export async function createTestQuestion(payload) {
   const res = await apiClient.post('/bank/questions', payload)
   return unwrap(res).question
