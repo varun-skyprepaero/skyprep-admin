@@ -2,6 +2,7 @@ import {
   Brain,
   BookOpen,
   Calendar,
+  ClipboardCheck,
   ClipboardList,
   Coins,
   FileText,
@@ -17,6 +18,7 @@ import {
 
 import {
   canAccessExamsSection,
+  canAccessReviewSection,
   canAccessRolesPermissionsSection,
   canAccessSubscriptionSection,
   canAccessTestsSection,
@@ -51,6 +53,12 @@ export const adminNav = [
     canAccess: canAccessExamsSection,
   },
   {
+    name: 'Review',
+    href: '/review',
+    icon: ClipboardCheck,
+    canAccess: canAccessReviewSection,
+  },
+  {
     name: 'Subscriptions',
     href: '/subscription',
     icon: Package,
@@ -82,6 +90,7 @@ export function getAdminNavTitle(pathname) {
   if (pathname.startsWith('/quizzes')) return 'Quizzes'
   if (pathname.startsWith('/exams')) return 'Exams'
   if (pathname.startsWith('/tests')) return 'Tests'
+  if (pathname.startsWith('/review')) return 'Review'
   if (pathname.startsWith('/subscription')) return 'Subscriptions'
   if (pathname.startsWith('/credits')) return 'Credits'
   if (pathname.startsWith('/roles-permissions')) return 'Roles & permissions'

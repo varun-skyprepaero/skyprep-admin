@@ -9,6 +9,7 @@
  *   timezone?: string | null
  *   createdAt?: string
  *   registrationSource?: 'SELF_REGISTERED' | 'INVITED' | 'ADMIN_CREATED' | null
+ *   auditor?: { uuid: string, name: string, email: string } | null
  * }} AdminUserRow
  */
 

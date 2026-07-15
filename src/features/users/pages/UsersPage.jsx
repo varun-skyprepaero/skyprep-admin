@@ -26,9 +26,14 @@ import {
   fetchPendingInvitations,
   resendInvitation,
 } from '@/features/invitations/api/invitations-api'
-import { INVITABLE_ROLE_OPTIONS, SUPER_ADMIN_ROLE_NAME } from '@/features/invitations/constants'
+import {
+  DATA_ENTRY_ROLE_NAME,
+  INVITABLE_ROLE_OPTIONS,
+  SUPER_ADMIN_ROLE_NAME,
+} from '@/features/invitations/constants'
 import {
   canAccessUsersSection,
+  canEditDataEntryAuditors,
   canImpersonateClassroomUser,
   canViewUserInDirectory,
   hasPermission,
@@ -38,7 +43,7 @@ import { CLASSROOM_APP_ROLE_NAMES } from '@/features/invitations/constants'
 import { GrantAccessDialog } from '@/features/subscription/components/GrantAccessDialog'
 import { fetchInvitableRoles } from '@/features/roles-permissions/api/permissions-api'
 import { ClassroomImpersonateDialog } from '@/features/users/components/ClassroomImpersonateDialog'
-import { adminUpdateUser, fetchUsers } from '@/features/users/api/users-api'
+import { adminUpdateUser, fetchAuditors, fetchUsers, setUserAuditor } from '@/features/users/api/users-api'
 import { handleApiError } from '@/lib/http/api-error'
 import { notifyError, notifySuccess } from '@/lib/notifications'
 import { useAuthStore } from '@/stores/auth-store'
@@ -49,6 +54,7 @@ import { Loader2, LogIn, UserPlus, X } from 'lucide-react'
 const usersQueryKey = ['admin', 'users', USER_ENDPOINTS.list]
 const invitationsQueryKey = ['admin', 'invitations', 'pending']
 const invitableRolesQueryKey = ['admin', 'invitable-roles']
+const auditorsQueryKey = ['admin', 'auditors']
 
 function formatShortDate(value) {
   if (!value) return '—'
@@ -95,6 +101,8 @@ function buildTableRows(users, invitations) {
     registrationSource: u.registrationSource ?? null,
     isActive: u.isActive,
     createdAt: u.createdAt,
+    auditor: u.auditor ?? null,
+    auditorUuid: u.auditor?.uuid ?? null,
     sortAt: u.createdAt || 0,
   }))
 
@@ -282,6 +290,9 @@ export default function UsersPage() {
   const [grantAccessTarget, setGrantAccessTarget] = useState(
     /** @type {null | { email: string, name: string }} */ (null),
   )
+  const [auditorTarget, setAuditorTarget] = useState(
+    /** @type {null | { uuid: string, name: string, auditorUuid: string | null }} */ (null),
+  )
 
   const [tableSearch, setTableSearch] = useState('')
   const [typeFilter, setTypeFilter] = useState('all')
@@ -311,6 +322,26 @@ export default function UsersPage() {
     },
     enabled: canAccessUsersSection(user, matrix),
   })
+
+  const canEditAuditors = canEditDataEntryAuditors(user, matrix)
+
+  const auditorsQuery = useQuery({
+    queryKey: auditorsQueryKey,
+    queryFn: fetchAuditors,
+    enabled: canAccessUsersSection(user, matrix) && canEditAuditors,
+  })
+
+  const auditorOptions = useMemo(
+    () =>
+      (auditorsQuery.data ?? []).map((a) => {
+        const name = [a.firstName, a.lastName].filter(Boolean).join(' ').trim()
+        let label
+        if (name && a.email) label = `${name} (${a.email})`
+        else label = name || a.email || a.uuid
+        return { uuid: a.uuid, label }
+      }),
+    [auditorsQuery.data],
+  )
 
   const apiRoleNames = useMemo(
     () => (invitableRolesQuery.data ?? []).map((role) => role.name),
@@ -444,6 +475,26 @@ export default function UsersPage() {
       notifyError(message || 'Unable to update user')
     },
   })
+
+  const auditorMutation = useMutation({
+    mutationFn: (/** @type {{ uuid: string, auditorUuid: string | null }} */ vars) =>
+      setUserAuditor(vars.uuid, vars.auditorUuid),
+    onSuccess: (response) => {
+      notifySuccess(response?.message ?? 'Auditor updated')
+      setAuditorTarget(null)
+      invalidatePeople()
+    },
+    onError: (error) => {
+      const { message } = handleApiError(error, 'Unable to update auditor')
+      notifyError(message || 'Unable to update auditor')
+    },
+  })
+
+  function openAssignAuditor(row) {
+    if (row.kind !== 'user' || row.roleName !== DATA_ENTRY_ROLE_NAME) return
+    const name = [row.firstName, row.lastName].filter(Boolean).join(' ') || row.email || 'User'
+    setAuditorTarget({ uuid: row.uuid, name, auditorUuid: row.auditorUuid ?? null })
+  }
 
   function handleInviteSubmit(e) {
     e.preventDefault()
@@ -656,12 +707,13 @@ export default function UsersPage() {
               </label>
             </DataTableToolbar>
             <DataTableContent>
-              <table className="w-full min-w-[1024px] caption-bottom text-left text-sm">
+              <table className="w-full min-w-[1160px] caption-bottom text-left text-sm">
                 <thead className="border-b border-border/80 bg-muted/40 [&_tr]:border-0">
                   <tr className="text-muted-foreground">
                     <th className="h-11 px-4 align-middle font-medium lg:px-6">Name</th>
                     <th className="h-11 px-4 align-middle font-medium lg:px-6">Email</th>
                     <th className="h-11 px-4 align-middle font-medium lg:px-6">Role</th>
+                    <th className="h-11 px-4 align-middle font-medium lg:px-6">Auditor</th>
                     <th className="h-11 px-4 align-middle font-medium lg:px-6">Signup</th>
                     <th className="h-11 px-4 align-middle font-medium lg:px-6">Account</th>
                     <th className="h-11 px-4 align-middle font-medium lg:px-6">Invitation</th>
@@ -673,7 +725,7 @@ export default function UsersPage() {
                 <tbody className="divide-y divide-border/60 [&_tr:last-child]:border-0">
                   {filteredRows.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="px-6 py-12 text-center text-muted-foreground">
+                      <td colSpan={8} className="px-6 py-12 text-center text-muted-foreground">
                         {rows.length === 0
                           ? 'No users or pending invitations yet.'
                           : 'No results match your search or filters.'}
@@ -703,6 +755,17 @@ export default function UsersPage() {
                             {row.email}
                           </td>
                           <td className="px-4 py-3 align-middle lg:px-6">{row.roleName ?? '—'}</td>
+                          <td className="px-4 py-3 align-middle lg:px-6">
+                            {row.kind === 'user' && row.roleName === DATA_ENTRY_ROLE_NAME ? (
+                              row.auditor?.name ? (
+                                <span className="text-sm">{row.auditor.name}</span>
+                              ) : (
+                                <span className="text-xs text-muted-foreground">Unassigned</span>
+                              )
+                            ) : (
+                              <span className="text-xs text-muted-foreground">—</span>
+                            )}
+                          </td>
                           <td className="px-4 py-3 align-middle lg:px-6">
                             <SignupSourceCell row={row} />
                           </td>
@@ -795,6 +858,16 @@ export default function UsersPage() {
                                           {
                                             label: 'Grant access',
                                             onClick: () => openGrantAccess(row),
+                                          },
+                                        ]
+                                      : []),
+                                    ...(canEditAuditors && row.roleName === DATA_ENTRY_ROLE_NAME
+                                      ? [
+                                          {
+                                            label: row.auditorUuid
+                                              ? 'Change auditor'
+                                              : 'Assign auditor',
+                                            onClick: () => openAssignAuditor(row),
                                           },
                                         ]
                                       : []),
@@ -1049,6 +1122,99 @@ export default function UsersPage() {
         initialEmail={grantAccessTarget?.email ?? ''}
         lockEmail={Boolean(grantAccessTarget?.email)}
       />
+
+      {auditorTarget ? (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-background/80 p-4 backdrop-blur-sm sm:items-center"
+          role="presentation"
+          onClick={() => !auditorMutation.isPending && setAuditorTarget(null)}
+        >
+          <Card
+            className="relative z-10 w-full max-w-md overflow-y-auto shadow-lg"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="assign-auditor-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <CardHeader>
+              <div className="flex items-start justify-between gap-4">
+                <div className="space-y-1">
+                  <CardTitle id="assign-auditor-title">Assign auditor</CardTitle>
+                  <CardDescription>
+                    Choose the admin who audits{' '}
+                    <span className="font-medium text-foreground">{auditorTarget.name}</span>&apos;s
+                    data-entry work.
+                  </CardDescription>
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="shrink-0"
+                  onClick={() => setAuditorTarget(null)}
+                  aria-label="Close"
+                  disabled={auditorMutation.isPending}
+                >
+                  <X className="size-4" aria-hidden />
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <form
+                className="space-y-4"
+                onSubmit={(e) => {
+                  e.preventDefault()
+                  auditorMutation.mutate({
+                    uuid: auditorTarget.uuid,
+                    auditorUuid: auditorTarget.auditorUuid || null,
+                  })
+                }}
+              >
+                <div className="space-y-2">
+                  <Label htmlFor="assign-auditor-select">Auditor</Label>
+                  <select
+                    id="assign-auditor-select"
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm"
+                    value={auditorTarget.auditorUuid ?? ''}
+                    onChange={(e) =>
+                      setAuditorTarget((s) =>
+                        s ? { ...s, auditorUuid: e.target.value || null } : s,
+                      )
+                    }
+                    disabled={auditorMutation.isPending || auditorsQuery.isLoading}
+                  >
+                    <option value="">Unassigned</option>
+                    {auditorOptions.map((opt) => (
+                      <option key={opt.uuid} value={opt.uuid}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                  {auditorsQuery.isLoading ? (
+                    <p className="text-xs text-muted-foreground">Loading auditors…</p>
+                  ) : null}
+                </div>
+                <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setAuditorTarget(null)}
+                    disabled={auditorMutation.isPending}
+                  >
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={auditorMutation.isPending}>
+                    {auditorMutation.isPending ? (
+                      <Loader2 className="size-4 animate-spin" aria-hidden />
+                    ) : null}
+                    Save
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+        </div>
+      ) : null}
 
       {cancelInviteTarget ? (
         <div

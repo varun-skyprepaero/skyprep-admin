@@ -50,6 +50,7 @@ const TrainingProgramsIndexRedirect = lazyWithRetry(() =>
   import('@/features/training/TrainingProgramsIndexRedirect'),
 )
 const StaffLoginPage = lazyWithRetry(() => import('@/features/auth/pages/StaffLoginPage'))
+const ReviewQueuePage = lazyWithRetry(() => import('@/features/review/pages/ReviewQueuePage'))
 
 export const router = createBrowserRouter([
   {
@@ -127,6 +128,14 @@ export const router = createBrowserRouter([
             element: (
               <SuspensePage>
                 <RolesPermissionsPage />
+              </SuspensePage>
+            ),
+          },
+          {
+            path: '/review',
+            element: (
+              <SuspensePage>
+                <ReviewQueuePage />
               </SuspensePage>
             ),
           },

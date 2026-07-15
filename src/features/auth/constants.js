@@ -20,7 +20,21 @@ export const INVITATION_ENDPOINTS = {
 
 export const USER_ENDPOINTS = {
   list: '/users',
+  auditors: '/users/auditors',
   profile: (uuid) => `/users/${uuid}`,
   adminUpdate: (uuid) => `/users/${uuid}/admin`,
+  setAuditor: (uuid) => `/users/${uuid}/auditor`,
   classroomImpersonate: (uuid) => `/users/${uuid}/classroom-impersonate`,
+}
+
+export const REVIEW_ENDPOINTS = {
+  queue: '/review/queue',
+  mine: '/review/mine',
+  stats: '/review/stats',
+  myEntries: '/review/my-entries',
+  entries: '/review/entries',
+  paymentStats: '/review/payments/stats',
+  payoutBatches: '/review/payments/batches',
+  markPaid: '/review/payments/mark-paid',
+  apply: (domain, entityType, uuid) => `/review/${domain}/${entityType}/${uuid}`,
 }

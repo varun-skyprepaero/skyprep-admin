@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Loader2, Plus } from 'lucide-react'
 import { DeleteConfirmDialog } from '@/components/ui/delete-confirm-dialog'
@@ -31,6 +32,7 @@ import {
   validateQuestionAnswers,
 } from '@/features/tests/lib/question-form-options'
 import { QuestionLinkMultiSelect } from '@/features/tests/components/QuestionLinkMultiSelect'
+import { QuestionViewContent } from '@/features/tests/components/QuestionViewContent'
 import {
   createTestQuestion,
   deleteTestQuestion,
@@ -42,6 +44,13 @@ import {
   fetchTestSuites,
   updateTestQuestion,
 } from '@/features/tests/api/tests-api'
+import { applyReviewDecision } from '@/features/review/api/review-api'
+import { ReviewStatusBadge } from '@/features/review/components/review-status-badge'
+import { ReviewActionDialog } from '@/features/review/components/review-action-dialog'
+import { REVIEW_STATUS_FILTER_OPTIONS } from '@/features/review/constants'
+import { hasPermission, isSuperAdmin } from '@/features/auth/lib/admin-section-access'
+import { useAuthStore } from '@/stores/auth-store'
+import { usePermissionsStore } from '@/stores/permissions-store'
 import { handleApiError } from '@/lib/http/api-error'
 import { notifyError, notifySuccess } from '@/lib/notifications'
 
@@ -56,10 +65,18 @@ const qkSuites = ['tests', 'suites']
 
 export default function TestsQuestionsPage() {
   const queryClient = useQueryClient()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const user = useAuthStore((s) => s.user)
+  const matrix = usePermissionsStore((s) => s.matrix)
+  const canReviewEdit = isSuperAdmin(user) || hasPermission(matrix, 'review.queue', 'edit', user)
   const [search, setSearch] = useState('')
   const [subjectFilter, setSubjectFilter] = useState('')
   const [lessonFilter, setLessonFilter] = useState('')
   const [difficultyFilter, setDifficultyFilter] = useState('')
+  const [reviewFilter, setReviewFilter] = useState('')
+  const [reviewAction, setReviewAction] = useState(
+    /** @type {null | { mode: 'flag' | 'resolve', row: any }} */ (null),
+  )
   const [dialog, setDialog] = useState(null)
   const [deleteTarget, setDeleteTarget] = useState(/** @type {{ uuid: string, label: string } | null} */ (null))
   const [form, setForm] = useState({
@@ -95,8 +112,9 @@ export default function TestsQuestionsPage() {
       params.lessonUuid = lessonFilter
     }
     if (difficultyFilter) params.difficulty = difficultyFilter
+    if (reviewFilter) params.reviewStatus = reviewFilter
     return params
-  }, [subjectFilter, lessonFilter, difficultyFilter])
+  }, [subjectFilter, lessonFilter, difficultyFilter, reviewFilter])
 
   const subjectSelected =
     Boolean(subjectFilter) && subjectFilter !== FILTER_NO_LESSON
@@ -124,6 +142,18 @@ export default function TestsQuestionsPage() {
   }, [data, search])
 
   const { paginatedRows, paginationProps, resetPage } = usePaginatedRows(filteredRows)
+
+  const viewParam = searchParams.get('view')
+  useEffect(() => {
+    if (!viewParam || !data.length) return
+    const match = data.find((q) => q.uuid === viewParam)
+    if (!match) return
+    openView(match)
+    const next = new URLSearchParams(searchParams)
+    next.delete('view')
+    setSearchParams(next, { replace: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewParam, data])
 
   const createMu = useMutation({
     mutationFn: () =>
@@ -193,6 +223,21 @@ export default function TestsQuestionsPage() {
     },
   })
 
+  const reviewMu = useMutation({
+    mutationFn: ({ uuid, status, note }) =>
+      applyReviewDecision({ entityType: 'question', uuid, status, note }),
+    onSuccess: (_data, variables) => {
+      notifySuccess(variables.status === 'FLAGGED' ? 'Marked for review' : 'Review resolved')
+      void queryClient.invalidateQueries({ queryKey: qkQ })
+      void queryClient.invalidateQueries({ queryKey: ['review'] })
+      setReviewAction(null)
+    },
+    onError: (err) => {
+      const { message } = handleApiError(err, 'Unable to update review')
+      notifyError(message)
+    },
+  })
+
   const booksForFormParams = form.subjectUuid
     ? { subjectUuid: form.subjectUuid }
     : {}
@@ -238,6 +283,10 @@ export default function TestsQuestionsPage() {
       options: defaultChoiceOptions(),
     })
     setDialog({ mode: 'create' })
+  }
+
+  function openView(row) {
+    setDialog({ mode: 'view', row })
   }
 
   function openEdit(row) {
@@ -357,6 +406,21 @@ export default function TestsQuestionsPage() {
                 </option>
               ))}
             </select>
+            <select
+              className={dataTableSelectClass}
+              aria-label="Filter by review status"
+              value={reviewFilter}
+              onChange={(e) => {
+                setReviewFilter(e.target.value)
+                resetPage()
+              }}
+            >
+              {REVIEW_STATUS_FILTER_OPTIONS.map((option) => (
+                <option key={option.value || 'any'} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
             <Button type="button" size="sm" onClick={openCreate}>
               <Plus className="size-4" aria-hidden />
               Add question
@@ -383,13 +447,14 @@ export default function TestsQuestionsPage() {
                       <th className="px-4 py-3 font-medium">Type</th>
                       <th className="px-4 py-3 font-medium">Difficulty</th>
                       <th className="px-4 py-3 font-medium">Score</th>
+                      <th className="px-4 py-3 font-medium">Review</th>
                       <DataTableActionsHeader />
                     </tr>
                   </thead>
                   <tbody>
                     {filteredRows.length === 0 ? (
                       <tr>
-                        <td colSpan={10} className="px-4 py-8 text-center text-muted-foreground">
+                        <td colSpan={11} className="px-4 py-8 text-center text-muted-foreground">
                           {data.length === 0
                             ? 'No questions yet.'
                             : 'No results match your filters.'}
@@ -419,14 +484,45 @@ export default function TestsQuestionsPage() {
                           <td className="px-4 py-3 text-xs">{row.type}</td>
                           <td className="px-4 py-3 text-xs">{row.difficulty}</td>
                           <td className="px-4 py-3">{row.score}</td>
+                          <td className="px-4 py-3">
+                            <ReviewStatusBadge status={row.reviewStatus} />
+                            {row.reviewNote && row.reviewStatus === 'FLAGGED' ? (
+                              <span
+                                className="mt-1 block max-w-[14rem] truncate text-[11px] text-muted-foreground"
+                                title={row.reviewNote}
+                              >
+                                {row.reviewNote}
+                              </span>
+                            ) : null}
+                          </td>
                           <DataTableRowActions
                             rowId={row.uuid}
-                            disabled={deleteMu.isPending}
+                            disabled={deleteMu.isPending || reviewMu.isPending}
                             items={[
                               {
                                 label: 'Edit',
                                 onClick: () => openEdit(row),
                               },
+                              ...(canReviewEdit
+                                ? [
+                                    {
+                                      label:
+                                        row.reviewStatus === 'FLAGGED'
+                                          ? 'Update review note'
+                                          : 'Mark for review',
+                                      onClick: () => setReviewAction({ mode: 'flag', row }),
+                                    },
+                                    ...(row.reviewStatus !== 'OK' && row.reviewStatus !== 'RESOLVED'
+                                      ? [
+                                          {
+                                            label: 'Resolve review',
+                                            onClick: () =>
+                                              setReviewAction({ mode: 'resolve', row }),
+                                          },
+                                        ]
+                                      : []),
+                                  ]
+                                : []),
                               {
                                 label: 'Delete',
                                 destructive: true,
@@ -464,9 +560,28 @@ export default function TestsQuestionsPage() {
             onClick={(e) => e.stopPropagation()}
           >
             <CardHeader>
-              <CardTitle>{dialog.mode === 'create' ? 'New question' : 'Edit question'}</CardTitle>
+              <CardTitle>
+                {dialog.mode === 'create'
+                  ? 'New question'
+                  : dialog.mode === 'view'
+                    ? 'Question'
+                    : 'Edit question'}
+              </CardTitle>
             </CardHeader>
             <CardContent>
+              {dialog.mode === 'view' ? (
+                <div className="space-y-4">
+                  <QuestionViewContent question={dialog.row} />
+                  <div className="flex justify-end gap-2 pt-2">
+                    <Button type="button" variant="outline" onClick={() => openEdit(dialog.row)}>
+                      Edit
+                    </Button>
+                    <Button type="button" onClick={() => setDialog(null)}>
+                      Close
+                    </Button>
+                  </div>
+                </div>
+              ) : (
               <form className="space-y-4" onSubmit={submit}>
                 <div className="space-y-2">
                   <Label htmlFor="q-subject">Subject</Label>
@@ -624,6 +739,7 @@ export default function TestsQuestionsPage() {
                   </Button>
                 </div>
               </form>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -644,6 +760,23 @@ export default function TestsQuestionsPage() {
         loading={deleteMu.isPending}
         onClose={() => setDeleteTarget(null)}
         onConfirm={() => deleteTarget && deleteMu.mutate(deleteTarget.uuid)}
+      />
+
+      <ReviewActionDialog
+        open={Boolean(reviewAction)}
+        mode={reviewAction?.mode ?? 'flag'}
+        itemTitle={reviewAction?.row?.stem?.slice(0, 80)}
+        currentNote={reviewAction?.row?.reviewNote}
+        loading={reviewMu.isPending}
+        onClose={() => !reviewMu.isPending && setReviewAction(null)}
+        onConfirm={(note) =>
+          reviewAction &&
+          reviewMu.mutate({
+            uuid: reviewAction.row.uuid,
+            status: reviewAction.mode === 'flag' ? 'FLAGGED' : 'RESOLVED',
+            note,
+          })
+        }
       />
     </div>
   )
