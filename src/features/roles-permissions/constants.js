@@ -29,7 +29,7 @@ export const ADMIN_PERMISSION_SECTIONS = [
     id: 'users',
     label: 'Users',
     screens: [
-      { id: 'users.directory', label: 'User directory', actions: ['view', 'edit'] },
+      { id: 'users.directory', label: 'User directory', actions: ['view', 'edit', 'delete'] },
       { id: 'users.invitations', label: 'Invitations', actions: ['view', 'invite'] },
       {
         id: 'users.impersonation',

@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/data-table'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { DeleteConfirmDialog } from '@/components/ui/delete-confirm-dialog'
 import { USER_ENDPOINTS } from '@/features/auth/constants'
 import {
   cancelInvitation,
@@ -43,7 +44,7 @@ import { CLASSROOM_APP_ROLE_NAMES } from '@/features/invitations/constants'
 import { GrantAccessDialog } from '@/features/subscription/components/GrantAccessDialog'
 import { fetchInvitableRoles } from '@/features/roles-permissions/api/permissions-api'
 import { ClassroomImpersonateDialog } from '@/features/users/components/ClassroomImpersonateDialog'
-import { adminUpdateUser, fetchAuditors, fetchUsers, setUserAuditor } from '@/features/users/api/users-api'
+import { adminDeleteUser, adminUpdateUser, fetchAuditors, fetchUsers, setUserAuditor } from '@/features/users/api/users-api'
 import { handleApiError } from '@/lib/http/api-error'
 import { notifyError, notifySuccess } from '@/lib/notifications'
 import { useAuthStore } from '@/stores/auth-store'
@@ -284,6 +285,9 @@ export default function UsersPage() {
   const [cancelInviteTarget, setCancelInviteTarget] = useState(
     /** @type {null | { uuid: string, email: string }} */ (null),
   )
+  const [deleteUserTarget, setDeleteUserTarget] = useState(
+    /** @type {null | { uuid: string, name: string, email: string }} */ (null),
+  )
   const [classroomImpersonateTarget, setClassroomImpersonateTarget] = useState(
     /** @type {null | { uuid: string, email: string, name: string }} */ (null),
   )
@@ -476,6 +480,19 @@ export default function UsersPage() {
     },
   })
 
+  const deleteUserMutation = useMutation({
+    mutationFn: (/** @type {string} */ userUuid) => adminDeleteUser(userUuid),
+    onSuccess: (response) => {
+      notifySuccess(response?.message ?? 'User deleted')
+      setDeleteUserTarget(null)
+      invalidatePeople()
+    },
+    onError: (error) => {
+      const { message } = handleApiError(error, 'Unable to delete user')
+      notifyError(message || 'Unable to delete user')
+    },
+  })
+
   const auditorMutation = useMutation({
     mutationFn: (/** @type {{ uuid: string, auditorUuid: string | null }} */ vars) =>
       setUserAuditor(vars.uuid, vars.auditorUuid),
@@ -520,6 +537,17 @@ export default function UsersPage() {
   function closeCancelInviteConfirm() {
     if (cancelInviteMutation.isPending) return
     setCancelInviteTarget(null)
+  }
+
+  function openDeleteUserConfirm(row) {
+    if (row.kind !== 'user') return
+    const name = [row.firstName, row.lastName].filter(Boolean).join(' ') || row.email || 'User'
+    setDeleteUserTarget({ uuid: row.uuid, name, email: row.email ?? '' })
+  }
+
+  function closeDeleteUserConfirm() {
+    if (deleteUserMutation.isPending) return
+    setDeleteUserTarget(null)
   }
 
   function openEditForUser(row) {
@@ -573,6 +601,16 @@ export default function UsersPage() {
 
   const canImpersonateUsers = canImpersonateClassroomUser(user, matrix)
   const canGrantAccess = hasPermission(matrix, 'tests.subscribers', 'edit', user)
+  const canDeleteUsers = hasPermission(matrix, 'users.directory', 'delete', user)
+
+  function canDeleteUserRow(row) {
+    return (
+      canDeleteUsers &&
+      row.kind === 'user' &&
+      row.uuid !== user?.uuid &&
+      row.roleName !== SUPER_ADMIN_ROLE_NAME
+    )
+  }
 
   function canGrantAccessToRow(row) {
     return (
@@ -816,7 +854,8 @@ export default function UsersPage() {
                             disabled={
                               resending ||
                               cancelInviteMutation.isPending ||
-                              adminUpdateMutation.isPending
+                              adminUpdateMutation.isPending ||
+                              deleteUserMutation.isPending
                             }
                             leading={
                               canImpersonateUsers &&
@@ -875,6 +914,16 @@ export default function UsersPage() {
                                       label: 'Edit user',
                                       onClick: () => openEditForUser(row),
                                     },
+                                    ...(canDeleteUserRow(row)
+                                      ? [
+                                          {
+                                            label: 'Delete user',
+                                            destructive: true,
+                                            onClick: () => openDeleteUserConfirm(row),
+                                            disabled: deleteUserMutation.isPending,
+                                          },
+                                        ]
+                                      : []),
                                   ]
                             }
                           />
@@ -1278,6 +1327,33 @@ export default function UsersPage() {
           </Card>
         </div>
       ) : null}
+
+      <DeleteConfirmDialog
+        open={Boolean(deleteUserTarget)}
+        title="Delete user?"
+        description={
+          deleteUserTarget ? (
+            <>
+              Remove{' '}
+              <span className="font-medium text-foreground">{deleteUserTarget.name}</span>
+              {deleteUserTarget.email ? (
+                <>
+                  {' '}
+                  (<span className="font-medium text-foreground">{deleteUserTarget.email}</span>)
+                </>
+              ) : null}{' '}
+              from the directory? They will be signed out and hidden from Users. The account is
+              soft-deleted, not permanently erased.
+            </>
+          ) : null
+        }
+        confirmLabel="Delete user"
+        loading={deleteUserMutation.isPending}
+        onConfirm={() => {
+          if (deleteUserTarget) deleteUserMutation.mutate(deleteUserTarget.uuid)
+        }}
+        onClose={closeDeleteUserConfirm}
+      />
     </div>
   )
 }
