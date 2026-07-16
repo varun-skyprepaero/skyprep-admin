@@ -71,5 +71,4 @@ export const REVIEW_ENTITY_LABELS = {
   lesson: 'Lesson',
   board: 'Board',
   suite: 'License',
-  package: 'Test series',
 }

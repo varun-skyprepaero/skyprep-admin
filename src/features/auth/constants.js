@@ -23,6 +23,7 @@ export const USER_ENDPOINTS = {
   auditors: '/users/auditors',
   profile: (uuid) => `/users/${uuid}`,
   adminUpdate: (uuid) => `/users/${uuid}/admin`,
+  adminDelete: (uuid) => `/users/${uuid}/admin`,
   setAuditor: (uuid) => `/users/${uuid}/auditor`,
   classroomImpersonate: (uuid) => `/users/${uuid}/classroom-impersonate`,
 }
