@@ -28,6 +28,19 @@ export async function adminUpdateUser(userUuid, payload) {
 }
 
 /**
+ * Soft-delete a user from the admin directory.
+ * @param {string} userUuid
+ */
+export async function adminDeleteUser(userUuid) {
+  try {
+    const { data } = await apiClient.delete(USER_ENDPOINTS.adminDelete(userUuid))
+    return data
+  } catch (error) {
+    throw toApiClientError(error)
+  }
+}
+
+/**
  * Staff eligible to audit data-entry work (Admins and Super Admins).
  * @returns {Promise<Array<import('./users-api.types').AdminUserRow>>}
  */
