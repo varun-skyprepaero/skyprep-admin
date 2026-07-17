@@ -19,6 +19,7 @@ import {
   DataTableToolbar,
 } from '@/components/ui/data-table'
 import { usePaginatedRows } from '@/hooks/use-paginated-rows'
+import { useOpenEditFromSearchParam } from '@/hooks/use-open-edit-from-search-param'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
@@ -127,6 +128,8 @@ export default function TestsSuitesPage() {
     })
     setDialog({ mode: 'edit', uuid: row.uuid, slug: row.slug })
   }
+
+  useOpenEditFromSearchParam(data, openEdit)
 
   function submit(e) {
     e.preventDefault()

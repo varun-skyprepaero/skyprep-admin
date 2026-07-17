@@ -1,12 +1,20 @@
 import { useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Loader2 } from 'lucide-react'
+import { Loader2, Pencil } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { DataTable, DataTableContent, dataTableSelectClass } from '@/components/ui/data-table'
+import {
+  DataTable,
+  DataTableContent,
+  DataTablePagination,
+  dataTableSelectClass,
+} from '@/components/ui/data-table'
 import { fetchMyEntries } from '@/features/review/api/review-api'
 import { ReviewStatusBadge } from '@/features/review/components/review-status-badge'
 import { PaymentStatusBadge } from '@/features/review/components/payment-status-badge'
-import { REVIEW_ENTITY_LABELS } from '@/features/review/constants'
+import { REVIEW_ENTITY_LABELS, reviewEntityEditHref } from '@/features/review/constants'
+import { usePaginatedRows } from '@/hooks/use-paginated-rows'
 
 function formatDate(value) {
   if (!value) return '—'
@@ -63,6 +71,8 @@ export function MyEntriesTab() {
     [items, typeFilter, paymentFilter],
   )
 
+  const { paginatedRows, paginationProps, resetPage } = usePaginatedRows(displayed)
+
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -86,7 +96,10 @@ export function MyEntriesTab() {
               className={dataTableSelectClass}
               aria-label="Filter by type"
               value={typeFilter}
-              onChange={(e) => setTypeFilter(e.target.value)}
+              onChange={(e) => {
+                setTypeFilter(e.target.value)
+                resetPage()
+              }}
             >
               <option value="">All types</option>
               {typeOptions.map((t) => (
@@ -100,7 +113,10 @@ export function MyEntriesTab() {
               className={dataTableSelectClass}
               aria-label="Filter by payment"
               value={paymentFilter}
-              onChange={(e) => setPaymentFilter(e.target.value)}
+              onChange={(e) => {
+                setPaymentFilter(e.target.value)
+                resetPage()
+              }}
             >
               <option value="">All</option>
               <option value="UNPAID">Unpaid</option>
@@ -118,7 +134,7 @@ export function MyEntriesTab() {
               </p>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[720px] text-left text-sm">
+                <table className="w-full min-w-[800px] text-left text-sm">
                   <thead className="border-b bg-muted/40 text-xs uppercase text-muted-foreground">
                     <tr>
                       <th className="px-4 py-3 font-medium">Type</th>
@@ -126,42 +142,69 @@ export function MyEntriesTab() {
                       <th className="px-4 py-3 font-medium">Review</th>
                       <th className="px-4 py-3 font-medium">Payment</th>
                       <th className="px-4 py-3 font-medium">Created</th>
+                      <th className="px-4 py-3 font-medium">
+                        <span className="sr-only">Actions</span>
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
-                    {displayed.length === 0 ? (
+                    {paginatedRows.length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="px-4 py-10 text-center text-muted-foreground">
+                        <td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">
                           No entries yet.
                         </td>
                       </tr>
                     ) : (
-                      displayed.map((item) => (
-                        <tr
-                          key={`${item.entityType}:${item.uuid}`}
-                          className="border-b border-border/60 align-top last:border-0"
-                        >
-                          <td className="px-4 py-3 text-xs">{entityLabel(item)}</td>
-                          <td className="max-w-sm px-4 py-3">
-                            <span className="line-clamp-2">{item.title || item.uuid}</span>
-                          </td>
-                          <td className="px-4 py-3">
-                            <ReviewStatusBadge status={item.reviewStatus} />
-                          </td>
-                          <td className="px-4 py-3">
-                            <PaymentStatusBadge status={item.paymentStatus} />
-                          </td>
-                          <td className="px-4 py-3 text-xs text-muted-foreground">
-                            {formatDate(item.createdAt)}
-                          </td>
-                        </tr>
-                      ))
+                      paginatedRows.map((item) => {
+                        const editHref = reviewEntityEditHref(item.entityType, item.uuid)
+                        return (
+                          <tr
+                            key={`${item.entityType}:${item.uuid}`}
+                            className="border-b border-border/60 align-top last:border-0"
+                          >
+                            <td className="px-4 py-3 text-xs">{entityLabel(item)}</td>
+                            <td className="max-w-sm px-4 py-3">
+                              <span className="line-clamp-2">{item.title || item.uuid}</span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <ReviewStatusBadge status={item.reviewStatus} />
+                            </td>
+                            <td className="px-4 py-3">
+                              <PaymentStatusBadge status={item.paymentStatus} />
+                            </td>
+                            <td className="px-4 py-3 text-xs text-muted-foreground">
+                              {formatDate(item.createdAt)}
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              {editHref ? (
+                                <Button
+                                  asChild
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-8 gap-1.5"
+                                >
+                                  <Link to={editHref}>
+                                    <Pencil className="size-3.5" aria-hidden />
+                                    Edit
+                                  </Link>
+                                </Button>
+                              ) : (
+                                <span className="text-xs text-muted-foreground">—</span>
+                              )}
+                            </td>
+                          </tr>
+                        )
+                      })
                     )}
                   </tbody>
                 </table>
               </div>
             )}
           </DataTableContent>
+          {!query.isLoading && !query.isError ? (
+            <DataTablePagination {...paginationProps} />
+          ) : null}
         </DataTable>
       </Card>
 

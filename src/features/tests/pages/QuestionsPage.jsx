@@ -21,6 +21,7 @@ import {
   dataTableSelectClass,
 } from '@/components/ui/data-table'
 import { usePaginatedRows } from '@/hooks/use-paginated-rows'
+import { useOpenEditFromSearchParam } from '@/hooks/use-open-edit-from-search-param'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { QuestionAnswerFields } from '@/features/tests/components/QuestionAnswerFields'
@@ -45,7 +46,6 @@ import {
   updateTestQuestion,
 } from '@/features/tests/api/tests-api'
 import { applyReviewDecision } from '@/features/review/api/review-api'
-import { ReviewStatusBadge } from '@/features/review/components/review-status-badge'
 import { ReviewActionDialog } from '@/features/review/components/review-action-dialog'
 import { REVIEW_STATUS_FILTER_OPTIONS } from '@/features/review/constants'
 import { hasPermission, isSuperAdmin } from '@/features/auth/lib/admin-section-access'
@@ -74,6 +74,7 @@ export default function TestsQuestionsPage() {
   const [lessonFilter, setLessonFilter] = useState('')
   const [difficultyFilter, setDifficultyFilter] = useState('')
   const [reviewFilter, setReviewFilter] = useState('')
+  const [mineOnly, setMineOnly] = useState(false)
   const [reviewAction, setReviewAction] = useState(
     /** @type {null | { mode: 'flag' | 'resolve', row: any }} */ (null),
   )
@@ -113,8 +114,9 @@ export default function TestsQuestionsPage() {
     }
     if (difficultyFilter) params.difficulty = difficultyFilter
     if (reviewFilter) params.reviewStatus = reviewFilter
+    if (mineOnly && user?.uuid) params.createdByUuid = user.uuid
     return params
-  }, [subjectFilter, lessonFilter, difficultyFilter, reviewFilter])
+  }, [subjectFilter, lessonFilter, difficultyFilter, reviewFilter, mineOnly, user?.uuid])
 
   const subjectSelected =
     Boolean(subjectFilter) && subjectFilter !== FILTER_NO_LESSON
@@ -315,6 +317,8 @@ export default function TestsQuestionsPage() {
     setDialog({ mode: 'edit', uuid: row.uuid })
   }
 
+  useOpenEditFromSearchParam(data, openEdit)
+
   function handleTypeChange(newType) {
     setForm((s) => ({
       ...s,
@@ -347,10 +351,17 @@ export default function TestsQuestionsPage() {
         <DataTable>
           <DataTableToolbar
             searchValue={search}
+            searchPlaceholder="Search questions…"
             onSearchChange={(value) => {
               setSearch(value)
               resetPage()
             }}
+            actions={
+              <Button type="button" size="sm" onClick={openCreate}>
+                <Plus className="size-4" aria-hidden />
+                Add question
+              </Button>
+            }
           >
             <select
               className={dataTableSelectClass}
@@ -421,10 +432,18 @@ export default function TestsQuestionsPage() {
                 </option>
               ))}
             </select>
-            <Button type="button" size="sm" onClick={openCreate}>
-              <Plus className="size-4" aria-hidden />
-              Add question
-            </Button>
+            <select
+              className={dataTableSelectClass}
+              aria-label="Filter by author"
+              value={mineOnly ? 'mine' : ''}
+              onChange={(e) => {
+                setMineOnly(e.target.value === 'mine')
+                resetPage()
+              }}
+            >
+              <option value="">All entries</option>
+              <option value="mine">My entries</option>
+            </select>
           </DataTableToolbar>
           <DataTableContent>
             {isLoading ? (
@@ -444,17 +463,14 @@ export default function TestsQuestionsPage() {
                       <th className="px-4 py-3 font-medium">Lessons</th>
                       <th className="px-4 py-3 font-medium">Boards</th>
                       <th className="px-4 py-3 font-medium">Licenses</th>
-                      <th className="px-4 py-3 font-medium">Type</th>
                       <th className="px-4 py-3 font-medium">Difficulty</th>
-                      <th className="px-4 py-3 font-medium">Score</th>
-                      <th className="px-4 py-3 font-medium">Review</th>
                       <DataTableActionsHeader />
                     </tr>
                   </thead>
                   <tbody>
                     {filteredRows.length === 0 ? (
                       <tr>
-                        <td colSpan={11} className="px-4 py-8 text-center text-muted-foreground">
+                        <td colSpan={8} className="px-4 py-8 text-center text-muted-foreground">
                           {data.length === 0
                             ? 'No questions yet.'
                             : 'No results match your filters.'}
@@ -481,20 +497,7 @@ export default function TestsQuestionsPage() {
                           <td className="px-4 py-3 text-xs">
                             {(row.suites ?? []).map((s) => s.name).join(', ') || '—'}
                           </td>
-                          <td className="px-4 py-3 text-xs">{row.type}</td>
                           <td className="px-4 py-3 text-xs">{row.difficulty}</td>
-                          <td className="px-4 py-3">{row.score}</td>
-                          <td className="px-4 py-3">
-                            <ReviewStatusBadge status={row.reviewStatus} />
-                            {row.reviewNote && row.reviewStatus === 'FLAGGED' ? (
-                              <span
-                                className="mt-1 block max-w-[14rem] truncate text-[11px] text-muted-foreground"
-                                title={row.reviewNote}
-                              >
-                                {row.reviewNote}
-                              </span>
-                            ) : null}
-                          </td>
                           <DataTableRowActions
                             rowId={row.uuid}
                             disabled={deleteMu.isPending || reviewMu.isPending}

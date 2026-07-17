@@ -72,3 +72,25 @@ export const REVIEW_ENTITY_LABELS = {
   board: 'Board',
   suite: 'License',
 }
+
+/** Admin routes that open the edit UI for a review entity (`?edit=<uuid>`). */
+export const REVIEW_ENTITY_EDIT_PATHS = {
+  question: '/tests/questions',
+  exam: '/exams',
+  subject: '/tests/subjects',
+  book: '/tests/books',
+  lesson: '/tests/lessons',
+  board: '/tests/boards',
+  suite: '/tests/suites',
+}
+
+/**
+ * @param {string} entityType
+ * @param {string} uuid
+ * @returns {string | null}
+ */
+export function reviewEntityEditHref(entityType, uuid) {
+  const base = REVIEW_ENTITY_EDIT_PATHS[entityType]
+  if (!base || !uuid) return null
+  return `${base}?edit=${encodeURIComponent(uuid)}`
+}

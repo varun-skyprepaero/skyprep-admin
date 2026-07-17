@@ -39,6 +39,7 @@ export function DataTable({ className, children }) {
  *   searchValue: string,
  *   onSearchChange: (value: string) => void,
  *   searchPlaceholder?: string,
+ *   actions?: React.ReactNode,
  *   children?: React.ReactNode,
  * }} props
  */
@@ -46,27 +47,39 @@ export function DataTableToolbar({
   searchValue,
   onSearchChange,
   searchPlaceholder = 'Search…',
+  actions,
   children,
 }) {
+  const hasActions = actions != null
+  const trailing = hasActions ? actions : children
+  const filters = hasActions ? children : null
+
   return (
-    <div className="flex flex-col gap-3 border-b border-border/80 bg-muted/30 px-4 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between lg:px-6">
-      <div className="relative min-w-[12rem] max-w-md flex-1">
-        <Search
-          className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
-          aria-hidden
-        />
-        <Input
-          className="h-9 pl-9"
-          type="search"
-          value={searchValue}
-          onChange={(e) => onSearchChange(e.target.value)}
-          placeholder={searchPlaceholder}
-          aria-label="Search table"
-          autoComplete="off"
-        />
+    <div className="border-b border-border/80 bg-muted/30">
+      <div className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between lg:px-6">
+        <div className="relative min-w-[12rem] max-w-md flex-1">
+          <Search
+            className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+            aria-hidden
+          />
+          <Input
+            className="h-9 pl-9"
+            type="search"
+            value={searchValue}
+            onChange={(e) => onSearchChange(e.target.value)}
+            placeholder={searchPlaceholder}
+            aria-label="Search table"
+            autoComplete="off"
+          />
+        </div>
+        {trailing ? (
+          <div className="flex flex-wrap items-center gap-2 sm:justify-end">{trailing}</div>
+        ) : null}
       </div>
-      {children ? (
-        <div className="flex flex-wrap items-center gap-2 sm:justify-end">{children}</div>
+      {filters ? (
+        <div className="flex flex-wrap items-center gap-2 border-t border-border/60 px-4 py-2.5 lg:px-6">
+          {filters}
+        </div>
       ) : null}
     </div>
   )
