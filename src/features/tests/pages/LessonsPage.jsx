@@ -5,11 +5,11 @@ import { DeleteConfirmDialog } from '@/components/ui/delete-confirm-dialog'
 import { Button } from '@/components/ui/button'
 import {
   Card,
-  CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
+import { Modal, ModalBody, ModalFooter, ModalHeader } from '@/components/ui/modal'
 import {
   DataTable,
   DataTableActionsHeader,
@@ -252,80 +252,76 @@ export default function TestsLessonsPage() {
       </Card>
 
       {dialog ? (
-        <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-background/80 p-4 backdrop-blur-sm sm:items-center"
-          role="presentation"
-          onClick={() => !createMu.isPending && !updateMu.isPending && setDialog(null)}
+        <Modal
+          open
+          onClose={() => setDialog(null)}
+          size="md"
+          closeDisabled={createMu.isPending || updateMu.isPending}
         >
-          <Card
-            className="relative z-10 max-h-[min(92vh,100dvh-2rem)] w-full max-w-md overflow-y-auto overscroll-contain shadow-lg"
-            role="dialog"
-            aria-modal="true"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <CardHeader>
-              <CardTitle>{dialog.mode === 'create' ? 'New lesson' : 'Edit lesson'}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <form className="space-y-4" onSubmit={submit}>
-                <div className="space-y-2">
-                  <Label htmlFor="lesson-subject">Subject</Label>
-                  <select
-                    id="lesson-subject"
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm"
-                    value={form.subjectUuid}
-                    onChange={(e) => setForm((s) => ({ ...s, subjectUuid: e.target.value }))}
-                    disabled={createMu.isPending || updateMu.isPending}
-                    required
-                  >
-                    <option value="">Select…</option>
-                    {subjects.map((s) => (
-                      <option key={s.uuid} value={s.uuid}>
-                        {s.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="lesson-name">Name</Label>
-                  <Input
-                    id="lesson-name"
-                    value={form.name}
-                    onChange={(e) => setForm((s) => ({ ...s, name: e.target.value }))}
-                    disabled={createMu.isPending || updateMu.isPending}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="lesson-desc">Description (optional)</Label>
-                  <textarea
-                    id="lesson-desc"
-                    className="min-h-[72px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm"
-                    value={form.description}
-                    onChange={(e) => setForm((s) => ({ ...s, description: e.target.value }))}
-                    disabled={createMu.isPending || updateMu.isPending}
-                  />
-                </div>
-                <div className="flex justify-end gap-2 pt-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setDialog(null)}
-                    disabled={createMu.isPending || updateMu.isPending}
-                  >
-                    Cancel
-                  </Button>
-                  <Button type="submit" disabled={createMu.isPending || updateMu.isPending}>
-                    {(createMu.isPending || updateMu.isPending) && (
-                      <Loader2 className="size-4 animate-spin" aria-hidden />
-                    )}
-                    Save
-                  </Button>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
-        </div>
+          <ModalHeader
+            title={dialog.mode === 'create' ? 'New lesson' : 'Edit lesson'}
+            onClose={() => setDialog(null)}
+            closeDisabled={createMu.isPending || updateMu.isPending}
+          />
+          <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col">
+            <ModalBody className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="lesson-subject">Subject</Label>
+                <select
+                  id="lesson-subject"
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm"
+                  value={form.subjectUuid}
+                  onChange={(e) => setForm((s) => ({ ...s, subjectUuid: e.target.value }))}
+                  disabled={createMu.isPending || updateMu.isPending}
+                  required
+                >
+                  <option value="">Select…</option>
+                  {subjects.map((s) => (
+                    <option key={s.uuid} value={s.uuid}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="lesson-name">Name</Label>
+                <Input
+                  id="lesson-name"
+                  value={form.name}
+                  onChange={(e) => setForm((s) => ({ ...s, name: e.target.value }))}
+                  disabled={createMu.isPending || updateMu.isPending}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="lesson-desc">Description (optional)</Label>
+                <textarea
+                  id="lesson-desc"
+                  className="min-h-[72px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm"
+                  value={form.description}
+                  onChange={(e) => setForm((s) => ({ ...s, description: e.target.value }))}
+                  disabled={createMu.isPending || updateMu.isPending}
+                />
+              </div>
+            </ModalBody>
+            <ModalFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setDialog(null)}
+                disabled={createMu.isPending || updateMu.isPending}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={createMu.isPending || updateMu.isPending}>
+                {(createMu.isPending || updateMu.isPending) && (
+                  <Loader2 className="size-4 animate-spin" aria-hidden />
+                )}
+                Save
+              </Button>
+            </ModalFooter>
+          </form>
+        </Modal>
       ) : null}
 
       <DeleteConfirmDialog

@@ -5,11 +5,11 @@ import { DeleteConfirmDialog } from '@/components/ui/delete-confirm-dialog'
 import { Button } from '@/components/ui/button'
 import {
   Card,
-  CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
+import { Modal, ModalBody, ModalFooter, ModalHeader } from '@/components/ui/modal'
 import {
   DataTable,
   DataTableActionsHeader,
@@ -263,98 +263,94 @@ export default function TestsBooksPage() {
       </Card>
 
       {dialog ? (
-        <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-background/80 p-4 backdrop-blur-sm sm:items-center"
-          role="presentation"
-          onClick={() => !createMu.isPending && !updateMu.isPending && setDialog(null)}
+        <Modal
+          open
+          onClose={() => setDialog(null)}
+          size="md"
+          closeDisabled={createMu.isPending || updateMu.isPending}
         >
-          <Card
-            className="relative z-10 max-h-[90vh] w-full max-w-lg overflow-y-auto shadow-lg"
-            role="dialog"
-            aria-modal="true"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <CardHeader>
-              <CardTitle>{dialog.mode === 'create' ? 'New book' : 'Edit book'}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <form className="space-y-4" onSubmit={submit}>
+          <ModalHeader
+            title={dialog.mode === 'create' ? 'New book' : 'Edit book'}
+            onClose={() => setDialog(null)}
+            closeDisabled={createMu.isPending || updateMu.isPending}
+          />
+          <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col">
+            <ModalBody className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="book-title">Title</Label>
+                <Input
+                  id="book-title"
+                  value={form.title}
+                  onChange={(e) => setForm((s) => ({ ...s, title: e.target.value }))}
+                  disabled={createMu.isPending || updateMu.isPending}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="book-subject">Subject (optional)</Label>
+                <select
+                  id="book-subject"
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm"
+                  value={form.subjectUuid}
+                  onChange={(e) => setForm((s) => ({ ...s, subjectUuid: e.target.value }))}
+                  disabled={createMu.isPending || updateMu.isPending}
+                >
+                  <option value="">None</option>
+                  {subjects.map((s) => (
+                    <option key={s.uuid} value={s.uuid}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
-                  <Label htmlFor="book-title">Title</Label>
+                  <Label htmlFor="book-author">Author</Label>
                   <Input
-                    id="book-title"
-                    value={form.title}
-                    onChange={(e) => setForm((s) => ({ ...s, title: e.target.value }))}
+                    id="book-author"
+                    value={form.author}
+                    onChange={(e) => setForm((s) => ({ ...s, author: e.target.value }))}
                     disabled={createMu.isPending || updateMu.isPending}
-                    required
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="book-subject">Subject (optional)</Label>
-                  <select
-                    id="book-subject"
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm"
-                    value={form.subjectUuid}
-                    onChange={(e) => setForm((s) => ({ ...s, subjectUuid: e.target.value }))}
-                    disabled={createMu.isPending || updateMu.isPending}
-                  >
-                    <option value="">None</option>
-                    {subjects.map((s) => (
-                      <option key={s.uuid} value={s.uuid}>
-                        {s.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-2">
-                    <Label htmlFor="book-author">Author</Label>
-                    <Input
-                      id="book-author"
-                      value={form.author}
-                      onChange={(e) => setForm((s) => ({ ...s, author: e.target.value }))}
-                      disabled={createMu.isPending || updateMu.isPending}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="book-edition">Edition</Label>
-                    <Input
-                      id="book-edition"
-                      value={form.edition}
-                      onChange={(e) => setForm((s) => ({ ...s, edition: e.target.value }))}
-                      disabled={createMu.isPending || updateMu.isPending}
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="book-isbn">ISBN</Label>
+                  <Label htmlFor="book-edition">Edition</Label>
                   <Input
-                    id="book-isbn"
-                    value={form.isbn}
-                    onChange={(e) => setForm((s) => ({ ...s, isbn: e.target.value }))}
+                    id="book-edition"
+                    value={form.edition}
+                    onChange={(e) => setForm((s) => ({ ...s, edition: e.target.value }))}
                     disabled={createMu.isPending || updateMu.isPending}
                   />
                 </div>
-                <div className="flex justify-end gap-2 pt-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setDialog(null)}
-                    disabled={createMu.isPending || updateMu.isPending}
-                  >
-                    Cancel
-                  </Button>
-                  <Button type="submit" disabled={createMu.isPending || updateMu.isPending}>
-                    {(createMu.isPending || updateMu.isPending) && (
-                      <Loader2 className="size-4 animate-spin" aria-hidden />
-                    )}
-                    Save
-                  </Button>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
-        </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="book-isbn">ISBN</Label>
+                <Input
+                  id="book-isbn"
+                  value={form.isbn}
+                  onChange={(e) => setForm((s) => ({ ...s, isbn: e.target.value }))}
+                  disabled={createMu.isPending || updateMu.isPending}
+                />
+              </div>
+            </ModalBody>
+            <ModalFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setDialog(null)}
+                disabled={createMu.isPending || updateMu.isPending}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={createMu.isPending || updateMu.isPending}>
+                {(createMu.isPending || updateMu.isPending) && (
+                  <Loader2 className="size-4 animate-spin" aria-hidden />
+                )}
+                Save
+              </Button>
+            </ModalFooter>
+          </form>
+        </Modal>
       ) : null}
 
       <DeleteConfirmDialog

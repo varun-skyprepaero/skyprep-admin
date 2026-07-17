@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Loader2, X } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Modal, ModalBody, ModalFooter, ModalHeader } from '@/components/ui/modal'
 import {
   DataTable,
   DataTableContent,
@@ -576,106 +577,85 @@ export default function ReviewQueuePage() {
         }
       />
 
-      {viewItem ? (
-        <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-background/80 p-4 backdrop-blur-sm sm:items-center"
-          role="presentation"
-          onClick={() => setViewItem(null)}
-        >
-          <Card
-            className="relative z-10 max-h-[92vh] w-full max-w-2xl overflow-y-auto shadow-lg"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="review-view-title"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <CardHeader>
-              <div className="flex items-start justify-between gap-4">
-                <div className="space-y-1">
-                  <CardTitle id="review-view-title">{entityLabel(viewItem)}</CardTitle>
-                  <CardDescription>
-                    By {viewItem.createdBy?.name ?? 'unknown'}
-                  </CardDescription>
-                </div>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="shrink-0"
-                  onClick={() => setViewItem(null)}
-                  aria-label="Close"
-                >
-                  <X className="size-4" aria-hidden />
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {viewQuery.isLoading ? (
-                <div className="flex justify-center py-12">
-                  <Loader2 className="size-8 animate-spin text-primary" aria-hidden />
-                </div>
-              ) : viewQuery.isError ? (
-                <p className="text-sm text-destructive">
-                  {viewQuery.error?.message ?? 'Unable to load this item.'}
-                </p>
-              ) : (
-                <div className="space-y-4">
-                  <QuestionViewContent question={viewQuery.data} />
-                  <div className="flex flex-wrap items-center justify-between gap-2 pt-2">
-                    <div className="flex flex-wrap gap-2">
-                      {canEdit ? (
-                        <>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            disabled={reviewMutation.isPending}
-                            onClick={() => {
-                              setAction({ mode: 'flag', item: viewItem })
-                              setViewItem(null)
-                            }}
-                          >
-                            Mark for review
-                          </Button>
-                          {viewItem.reviewStatus !== 'ACCEPTED' ? (
-                            <Button
-                              type="button"
-                              disabled={reviewMutation.isPending}
-                              onClick={() =>
-                                reviewMutation.mutate(
-                                  { item: viewItem, status: 'ACCEPTED' },
-                                  { onSuccess: () => setViewItem(nextItem) },
-                                )
-                              }
-                            >
-                              {reviewMutation.isPending ? (
-                                <Loader2 className="size-4 animate-spin" aria-hidden />
-                              ) : null}
-                              Approve
-                            </Button>
-                          ) : null}
-                        </>
+      <Modal
+        open={Boolean(viewItem)}
+        onClose={() => setViewItem(null)}
+        size="lg"
+        closeDisabled={reviewMutation.isPending}
+        aria-labelledby="review-view-title"
+      >
+        <ModalHeader
+          title={viewItem ? entityLabel(viewItem) : ''}
+          description={viewItem ? `By ${viewItem.createdBy?.name ?? 'unknown'}` : undefined}
+          titleId="review-view-title"
+          onClose={() => setViewItem(null)}
+          closeDisabled={reviewMutation.isPending}
+        />
+        <ModalBody>
+          {viewQuery.isLoading ? (
+            <div className="flex justify-center py-12">
+              <Loader2 className="size-8 animate-spin text-primary" aria-hidden />
+            </div>
+          ) : viewQuery.isError ? (
+            <p className="text-sm text-destructive">
+              {viewQuery.error?.message ?? 'Unable to load this item.'}
+            </p>
+          ) : viewItem ? (
+            <QuestionViewContent question={viewQuery.data} />
+          ) : null}
+        </ModalBody>
+        {viewItem && !viewQuery.isLoading && !viewQuery.isError ? (
+          <ModalFooter className="flex-wrap sm:justify-between">
+            <div className="flex flex-wrap gap-2">
+              {canEdit ? (
+                <>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={reviewMutation.isPending}
+                    onClick={() => {
+                      setAction({ mode: 'flag', item: viewItem })
+                      setViewItem(null)
+                    }}
+                  >
+                    Mark for review
+                  </Button>
+                  {viewItem.reviewStatus !== 'ACCEPTED' ? (
+                    <Button
+                      type="button"
+                      disabled={reviewMutation.isPending}
+                      onClick={() =>
+                        reviewMutation.mutate(
+                          { item: viewItem, status: 'ACCEPTED' },
+                          { onSuccess: () => setViewItem(nextItem) },
+                        )
+                      }
+                    >
+                      {reviewMutation.isPending ? (
+                        <Loader2 className="size-4 animate-spin" aria-hidden />
                       ) : null}
-                    </div>
-                    <div className="flex gap-2">
-                      <Button type="button" variant="ghost" onClick={() => setViewItem(null)}>
-                        Close
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        disabled={!nextItem}
-                        onClick={() => setViewItem(nextItem)}
-                      >
-                        Next
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      ) : null}
+                      Approve
+                    </Button>
+                  ) : null}
+                </>
+              ) : null}
+            </div>
+            <div className="flex gap-2">
+              <Button type="button" variant="ghost" onClick={() => setViewItem(null)}>
+                Close
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={!nextItem}
+                onClick={() => setViewItem(nextItem)}
+              >
+                Next
+              </Button>
+            </div>
+          </ModalFooter>
+        ) : null}
+      </Modal>
     </div>
   )
 }

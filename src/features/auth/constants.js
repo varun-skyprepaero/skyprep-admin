@@ -20,10 +20,12 @@ export const INVITATION_ENDPOINTS = {
 
 export const USER_ENDPOINTS = {
   list: '/users',
+  deleted: '/users/deleted',
   auditors: '/users/auditors',
   profile: (uuid) => `/users/${uuid}`,
   adminUpdate: (uuid) => `/users/${uuid}/admin`,
   adminDelete: (uuid) => `/users/${uuid}/admin`,
+  permanentDelete: (uuid) => `/users/${uuid}/permanent`,
   setAuditor: (uuid) => `/users/${uuid}/auditor`,
   classroomImpersonate: (uuid) => `/users/${uuid}/classroom-impersonate`,
 }

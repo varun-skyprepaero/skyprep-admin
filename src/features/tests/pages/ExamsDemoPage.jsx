@@ -9,6 +9,7 @@ import {
   Trash2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Modal, ModalBody, ModalFooter, ModalHeader } from '@/components/ui/modal'
 import {
   Card,
   CardContent,
@@ -465,72 +466,67 @@ export default function ExamsDemoPage() {
       </div>
 
       {createOpen ? (
-        <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-background/80 p-4 backdrop-blur-sm sm:items-center"
-          role="presentation"
-          onClick={() => setCreateOpen(false)}
+        <Modal
+          open
+          onClose={() => setCreateOpen(false)}
+          size="md"
+          aria-labelledby="create-exam-title"
         >
-          <Card
-            className="relative z-10 max-h-[min(92vh,100dvh-2rem)] w-full max-w-md overflow-y-auto overscroll-contain shadow-lg"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="create-exam-title"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <CardHeader>
-              <CardTitle id="create-exam-title">New exam</CardTitle>
-              <CardDescription>Pick a regulatory board and license.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="exam-board">Board</Label>
-                <select
-                  id="exam-board"
-                  className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-                  value={draftBoardId}
-                  onChange={(e) => {
-                    const boardId = e.target.value
-                    setDraftBoardId(boardId)
-                    setDraftSuiteId(suitesForBoard(boardId)[0]?.id ?? '')
-                  }}
-                >
-                  {DEMO_BOARDS.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {b.code} — {b.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="exam-suite">License</Label>
-                <select
-                  id="exam-suite"
-                  className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-                  value={draftSuiteId}
-                  onChange={(e) => setDraftSuiteId(e.target.value)}
-                >
-                  {draftSuites.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="rounded-md border border-dashed border-border/80 bg-muted/20 px-3 py-2 text-sm">
-                <span className="text-muted-foreground">Exam name: </span>
-                <span className="font-semibold">{draftName}</span>
-              </div>
-              <div className="flex justify-end gap-2 pt-1">
-                <Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>
-                  Cancel
-                </Button>
-                <Button type="button" onClick={createExam} disabled={!draftSuiteId}>
-                  Create exam
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+          <ModalHeader
+            title="New exam"
+            description="Pick a regulatory board and license."
+            titleId="create-exam-title"
+            onClose={() => setCreateOpen(false)}
+          />
+          <ModalBody className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="exam-board">Board</Label>
+              <select
+                id="exam-board"
+                className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                value={draftBoardId}
+                onChange={(e) => {
+                  const boardId = e.target.value
+                  setDraftBoardId(boardId)
+                  setDraftSuiteId(suitesForBoard(boardId)[0]?.id ?? '')
+                }}
+              >
+                {DEMO_BOARDS.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.code} — {b.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="exam-suite">License</Label>
+              <select
+                id="exam-suite"
+                className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                value={draftSuiteId}
+                onChange={(e) => setDraftSuiteId(e.target.value)}
+              >
+                {draftSuites.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="rounded-md border border-dashed border-border/80 bg-muted/20 px-3 py-2 text-sm">
+              <span className="text-muted-foreground">Exam name: </span>
+              <span className="font-semibold">{draftName}</span>
+            </div>
+          </ModalBody>
+          <ModalFooter>
+            <Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="button" onClick={createExam} disabled={!draftSuiteId}>
+              Create exam
+            </Button>
+          </ModalFooter>
+        </Modal>
       ) : null}
     </div>
   )

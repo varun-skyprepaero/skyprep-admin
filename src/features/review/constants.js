@@ -94,3 +94,11 @@ export function reviewEntityEditHref(entityType, uuid) {
   if (!base || !uuid) return null
   return `${base}?edit=${encodeURIComponent(uuid)}`
 }
+
+/**
+ * Authors cannot delete entries once accepted for payment or already paid.
+ * @param {{ reviewStatus?: string, paymentStatus?: string }} item
+ */
+export function isReviewEntryDeleteDisabled(item) {
+  return item.reviewStatus === REVIEW_STATUS.ACCEPTED || item.paymentStatus === PAYMENT_STATUS.PAID
+}

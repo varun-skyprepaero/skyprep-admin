@@ -15,6 +15,19 @@ export async function fetchUsers() {
 }
 
 /**
+ * Soft-deleted accounts (still block signup / role deletion until permanently removed).
+ * @returns {Promise<Array<import('./users-api.types').AdminUserRow>>}
+ */
+export async function fetchDeletedUsers() {
+  try {
+    const { data } = await apiClient.get(USER_ENDPOINTS.deleted)
+    return Array.isArray(data?.data) ? data.data : []
+  } catch (error) {
+    throw toApiClientError(error)
+  }
+}
+
+/**
  * @param {string} userUuid
  * @param {{ firstName?: string, lastName?: string | null, isActive?: boolean }} payload
  */
@@ -34,6 +47,19 @@ export async function adminUpdateUser(userUuid, payload) {
 export async function adminDeleteUser(userUuid) {
   try {
     const { data } = await apiClient.delete(USER_ENDPOINTS.adminDelete(userUuid))
+    return data
+  } catch (error) {
+    throw toApiClientError(error)
+  }
+}
+
+/**
+ * Permanently erase a soft-deleted user (frees email and role FK).
+ * @param {string} userUuid
+ */
+export async function permanentlyDeleteUser(userUuid) {
+  try {
+    const { data } = await apiClient.delete(USER_ENDPOINTS.permanentDelete(userUuid))
     return data
   } catch (error) {
     throw toApiClientError(error)

@@ -13,6 +13,7 @@ import {
   Trash2,
 } from 'lucide-react'
 import { DeleteConfirmDialog } from '@/components/ui/delete-confirm-dialog'
+import { Modal, ModalBody, ModalFooter, ModalHeader } from '@/components/ui/modal'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -1012,119 +1013,113 @@ export default function ExamsPage() {
       )}
 
       {createOpen ? (
-        <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-background/80 p-4 backdrop-blur-sm sm:items-center"
-          role="presentation"
-          onClick={() => !createMu.isPending && setCreateOpen(false)}
+        <Modal
+          open
+          onClose={() => setCreateOpen(false)}
+          size="lg"
+          closeDisabled={createMu.isPending}
         >
-          <Card
-            className="relative z-10 max-h-[min(92vh,100dvh-2rem)] w-full max-w-md overflow-y-auto overscroll-contain shadow-lg"
-            role="dialog"
-            aria-modal="true"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <CardHeader>
-              <CardTitle>New exam</CardTitle>
-              <CardDescription>
-                One exam blueprint per board + license. The license must be linked to the board.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="exam-board">Board</Label>
-                <select
-                  id="exam-board"
-                  className={selectClass}
-                  value={draftBoardUuid}
-                  onChange={(e) => {
-                    const boardUuid = e.target.value
-                    const board = boards.find((b) => b.uuid === boardUuid)
-                    setDraftBoardUuid(boardUuid)
-                    setDraftSuiteUuid(board?.suites?.[0]?.uuid ?? '')
-                  }}
-                  disabled={createMu.isPending}
-                >
-                  {boards.map((b) => (
-                    <option key={b.uuid} value={b.uuid}>
-                      {b.code} — {b.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="exam-suite">License</Label>
-                <select
-                  id="exam-suite"
-                  className={selectClass}
-                  value={draftSuiteUuid}
-                  onChange={(e) => setDraftSuiteUuid(e.target.value)}
-                  disabled={createMu.isPending || draftSuites.length === 0}
-                >
-                  {draftSuites.map((s) => (
-                    <option key={s.uuid} value={s.uuid}>
-                      {s.name}
-                    </option>
-                  ))}
-                </select>
-                {draftSuites.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">
-                    Link licenses to this board before creating an exam.
-                  </p>
-                ) : null}
-              </div>
-              <div className="rounded-md border border-dashed border-border/80 bg-muted/20 px-3 py-2 text-sm">
-                <span className="text-muted-foreground">Catalog name: </span>
-                <span className="font-semibold">{draftName || '—'}</span>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="create-display-name">Display name (optional)</Label>
-                <Input
-                  id="create-display-name"
-                  value={draftDisplayName}
-                  onChange={(e) => setDraftDisplayName(e.target.value)}
-                  disabled={createMu.isPending}
-                  placeholder="Marketing title for storefronts"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="create-description">Description (optional)</Label>
-                <textarea
-                  id="create-description"
-                  className="min-h-[72px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm"
-                  value={draftDescription}
-                  onChange={(e) => setDraftDescription(e.target.value)}
-                  disabled={createMu.isPending}
-                  placeholder="Brief description for marketing and product pages"
-                />
-              </div>
-              <div className="flex justify-end gap-2 pt-1">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setCreateOpen(false)}
-                  disabled={createMu.isPending}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="button"
-                  onClick={() => createMu.mutate()}
-                  disabled={
-                    createMu.isPending ||
-                    !draftBoardUuid ||
-                    !draftSuiteUuid ||
-                    !subjects.length
-                  }
-                >
-                  {createMu.isPending ? (
-                    <Loader2 className="size-4 animate-spin" aria-hidden />
-                  ) : null}
-                  Create exam
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+          <ModalHeader
+            title="New exam"
+            description="One exam blueprint per board + license. The license must be linked to the board."
+            onClose={() => setCreateOpen(false)}
+            closeDisabled={createMu.isPending}
+          />
+          <ModalBody className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="exam-board">Board</Label>
+              <select
+                id="exam-board"
+                className={selectClass}
+                value={draftBoardUuid}
+                onChange={(e) => {
+                  const boardUuid = e.target.value
+                  const board = boards.find((b) => b.uuid === boardUuid)
+                  setDraftBoardUuid(boardUuid)
+                  setDraftSuiteUuid(board?.suites?.[0]?.uuid ?? '')
+                }}
+                disabled={createMu.isPending}
+              >
+                {boards.map((b) => (
+                  <option key={b.uuid} value={b.uuid}>
+                    {b.code} — {b.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="exam-suite">License</Label>
+              <select
+                id="exam-suite"
+                className={selectClass}
+                value={draftSuiteUuid}
+                onChange={(e) => setDraftSuiteUuid(e.target.value)}
+                disabled={createMu.isPending || draftSuites.length === 0}
+              >
+                {draftSuites.map((s) => (
+                  <option key={s.uuid} value={s.uuid}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+              {draftSuites.length === 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  Link licenses to this board before creating an exam.
+                </p>
+              ) : null}
+            </div>
+            <div className="rounded-md border border-dashed border-border/80 bg-muted/20 px-3 py-2 text-sm">
+              <span className="text-muted-foreground">Catalog name: </span>
+              <span className="font-semibold">{draftName || '—'}</span>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="create-display-name">Display name (optional)</Label>
+              <Input
+                id="create-display-name"
+                value={draftDisplayName}
+                onChange={(e) => setDraftDisplayName(e.target.value)}
+                disabled={createMu.isPending}
+                placeholder="Marketing title for storefronts"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="create-description">Description (optional)</Label>
+              <textarea
+                id="create-description"
+                className="min-h-[72px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm"
+                value={draftDescription}
+                onChange={(e) => setDraftDescription(e.target.value)}
+                disabled={createMu.isPending}
+                placeholder="Brief description for marketing and product pages"
+              />
+            </div>
+          </ModalBody>
+          <ModalFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setCreateOpen(false)}
+              disabled={createMu.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={() => createMu.mutate()}
+              disabled={
+                createMu.isPending ||
+                !draftBoardUuid ||
+                !draftSuiteUuid ||
+                !subjects.length
+              }
+            >
+              {createMu.isPending ? (
+                <Loader2 className="size-4 animate-spin" aria-hidden />
+              ) : null}
+              Create exam
+            </Button>
+          </ModalFooter>
+        </Modal>
       ) : null}
 
       <DeleteConfirmDialog

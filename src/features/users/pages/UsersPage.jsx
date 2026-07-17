@@ -2,13 +2,7 @@ import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Navigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card'
+import { Modal, ModalBody, ModalFooter, ModalHeader } from '@/components/ui/modal'
 import {
   DataTable,
   DataTableContent,
@@ -44,15 +38,16 @@ import { CLASSROOM_APP_ROLE_NAMES } from '@/features/invitations/constants'
 import { GrantAccessDialog } from '@/features/subscription/components/GrantAccessDialog'
 import { fetchInvitableRoles } from '@/features/roles-permissions/api/permissions-api'
 import { ClassroomImpersonateDialog } from '@/features/users/components/ClassroomImpersonateDialog'
-import { adminDeleteUser, adminUpdateUser, fetchAuditors, fetchUsers, setUserAuditor } from '@/features/users/api/users-api'
+import { adminDeleteUser, adminUpdateUser, fetchAuditors, fetchDeletedUsers, fetchUsers, permanentlyDeleteUser, setUserAuditor } from '@/features/users/api/users-api'
 import { handleApiError } from '@/lib/http/api-error'
 import { notifyError, notifySuccess } from '@/lib/notifications'
 import { useAuthStore } from '@/stores/auth-store'
 import { usePermissionsStore } from '@/stores/permissions-store'
 import { cn } from '@/lib/utils'
-import { Loader2, LogIn, UserPlus, X } from 'lucide-react'
+import { Loader2, LogIn, UserPlus } from 'lucide-react'
 
 const usersQueryKey = ['admin', 'users', USER_ENDPOINTS.list]
+const deletedUsersQueryKey = ['admin', 'users', USER_ENDPOINTS.deleted]
 const invitationsQueryKey = ['admin', 'invitations', 'pending']
 const invitableRolesQueryKey = ['admin', 'invitable-roles']
 const auditorsQueryKey = ['admin', 'auditors']
@@ -288,6 +283,10 @@ export default function UsersPage() {
   const [deleteUserTarget, setDeleteUserTarget] = useState(
     /** @type {null | { uuid: string, name: string, email: string }} */ (null),
   )
+  const [permanentDeleteTarget, setPermanentDeleteTarget] = useState(
+    /** @type {null | { uuid: string, name: string, email: string }} */ (null),
+  )
+  const [peopleList, setPeopleList] = useState(/** @type {'active' | 'deleted'} */ ('active'))
   const [classroomImpersonateTarget, setClassroomImpersonateTarget] = useState(
     /** @type {null | { uuid: string, email: string, name: string }} */ (null),
   )
@@ -312,10 +311,16 @@ export default function UsersPage() {
     enabled: canAccessUsersSection(user, matrix),
   })
 
+  const deletedUsersQuery = useQuery({
+    queryKey: deletedUsersQueryKey,
+    queryFn: fetchDeletedUsers,
+    enabled: canAccessUsersSection(user, matrix) && peopleList === 'deleted',
+  })
+
   const invitationsQuery = useQuery({
     queryKey: invitationsQueryKey,
     queryFn: fetchPendingInvitations,
-    enabled: canAccessUsersSection(user, matrix),
+    enabled: canAccessUsersSection(user, matrix) && peopleList === 'active',
   })
 
   const invitableRolesQuery = useQuery({
@@ -375,6 +380,21 @@ export default function UsersPage() {
     [usersQuery.data, invitationsQuery.data, user, matrix],
   )
 
+  const deletedRows = useMemo(() => {
+    return (deletedUsersQuery.data ?? [])
+      .filter((u) => canViewUserInDirectory(user, u.role?.name ?? null, matrix))
+      .map((u) => ({
+        key: `deleted:${u.uuid}`,
+        uuid: u.uuid,
+        email: u.email,
+        firstName: u.firstName,
+        lastName: u.lastName,
+        roleName: u.role?.name ?? null,
+        deletedAt: u.deletedAt ?? null,
+        createdAt: u.createdAt,
+      }))
+  }, [deletedUsersQuery.data, user, matrix])
+
   const filterState = useMemo(
     () => ({ typeFilter, roleFilter, statusFilter, signupSourceFilter }),
     [typeFilter, roleFilter, statusFilter, signupSourceFilter],
@@ -386,7 +406,22 @@ export default function UsersPage() {
     )
   }, [rows, filterState, tableSearch])
 
-  const totalFiltered = filteredRows.length
+  const filteredDeletedRows = useMemo(() => {
+    const q = tableSearch.trim().toLowerCase()
+    if (!q) return deletedRows
+    return deletedRows.filter((row) => {
+      const name = [row.firstName, row.lastName].filter(Boolean).join(' ').toLowerCase()
+      return (
+        name.includes(q) ||
+        (row.email ?? '').toLowerCase().includes(q) ||
+        (row.roleName ?? '').toLowerCase().includes(q)
+      )
+    })
+  }, [deletedRows, tableSearch])
+
+  const activeTotalFiltered = filteredRows.length
+  const deletedTotalFiltered = filteredDeletedRows.length
+  const totalFiltered = peopleList === 'deleted' ? deletedTotalFiltered : activeTotalFiltered
   const totalPages = Math.max(1, Math.ceil(totalFiltered / pageSize) || 1)
   const effectivePage = Math.min(Math.max(1, page), totalPages)
 
@@ -395,8 +430,14 @@ export default function UsersPage() {
     return filteredRows.slice(start, start + pageSize)
   }, [filteredRows, effectivePage, pageSize])
 
+  const paginatedDeletedRows = useMemo(() => {
+    const start = (effectivePage - 1) * pageSize
+    return filteredDeletedRows.slice(start, start + pageSize)
+  }, [filteredDeletedRows, effectivePage, pageSize])
+
   function invalidatePeople() {
     queryClient.invalidateQueries({ queryKey: usersQueryKey })
+    queryClient.invalidateQueries({ queryKey: deletedUsersQueryKey })
     queryClient.invalidateQueries({ queryKey: invitationsQueryKey })
   }
 
@@ -493,6 +534,19 @@ export default function UsersPage() {
     },
   })
 
+  const permanentDeleteMutation = useMutation({
+    mutationFn: (/** @type {string} */ userUuid) => permanentlyDeleteUser(userUuid),
+    onSuccess: (response) => {
+      notifySuccess(response?.message ?? 'User permanently deleted')
+      setPermanentDeleteTarget(null)
+      invalidatePeople()
+    },
+    onError: (error) => {
+      const { message } = handleApiError(error, 'Unable to permanently delete user')
+      notifyError(message || 'Unable to permanently delete user')
+    },
+  })
+
   const auditorMutation = useMutation({
     mutationFn: (/** @type {{ uuid: string, auditorUuid: string | null }} */ vars) =>
       setUserAuditor(vars.uuid, vars.auditorUuid),
@@ -550,6 +604,23 @@ export default function UsersPage() {
     setDeleteUserTarget(null)
   }
 
+  function openPermanentDeleteConfirm(row) {
+    const name = [row.firstName, row.lastName].filter(Boolean).join(' ') || row.email || 'User'
+    setPermanentDeleteTarget({ uuid: row.uuid, name, email: row.email ?? '' })
+  }
+
+  function closePermanentDeleteConfirm() {
+    if (permanentDeleteMutation.isPending) return
+    setPermanentDeleteTarget(null)
+  }
+
+  function switchPeopleList(next) {
+    if (next === peopleList) return
+    setPeopleList(next)
+    setPage(1)
+    setTableSearch('')
+  }
+
   function openEditForUser(row) {
     if (row.kind !== 'user') return
     setEditErrors({})
@@ -580,12 +651,20 @@ export default function UsersPage() {
     adminUpdateMutation.mutate({ uuid: editUser.uuid, payload })
   }
 
-  const loadingPeople = usersQuery.isLoading || invitationsQuery.isLoading
-  const peopleError = usersQuery.isError
-    ? usersQuery.error
-    : invitationsQuery.isError
-      ? invitationsQuery.error
-      : null
+  const loadingPeople =
+    peopleList === 'deleted'
+      ? deletedUsersQuery.isLoading
+      : usersQuery.isLoading || invitationsQuery.isLoading
+  const peopleError =
+    peopleList === 'deleted'
+      ? deletedUsersQuery.isError
+        ? deletedUsersQuery.error
+        : null
+      : usersQuery.isError
+        ? usersQuery.error
+        : invitationsQuery.isError
+          ? invitationsQuery.error
+          : null
 
   if (!hasHydrated || isBootstrapping) {
     return (
@@ -646,11 +725,45 @@ export default function UsersPage() {
       </div>
 
       <section className="space-y-3">
-        <div>
-          <h2 className="text-lg font-semibold tracking-tight">People</h2>
-          <p className="text-sm text-muted-foreground">
-            Registered accounts and outstanding invitations (same email only appears once).
-          </p>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold tracking-tight">
+              {peopleList === 'deleted' ? 'Deleted users' : 'People'}
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              {peopleList === 'deleted'
+                ? 'Soft-deleted accounts still block signup with the same email and keep their role until permanently deleted.'
+                : 'Registered accounts and outstanding invitations (same email only appears once).'}
+            </p>
+          </div>
+          <div
+            className="inline-flex shrink-0 rounded-lg border border-border/80 p-0.5"
+            role="tablist"
+            aria-label="User list"
+          >
+            <Button
+              type="button"
+              role="tab"
+              aria-selected={peopleList === 'active'}
+              variant={peopleList === 'active' ? 'default' : 'ghost'}
+              size="sm"
+              className="h-8"
+              onClick={() => switchPeopleList('active')}
+            >
+              Active
+            </Button>
+            <Button
+              type="button"
+              role="tab"
+              aria-selected={peopleList === 'deleted'}
+              variant={peopleList === 'deleted' ? 'default' : 'ghost'}
+              size="sm"
+              className="h-8"
+              onClick={() => switchPeopleList('deleted')}
+            >
+              Deleted
+            </Button>
+          </div>
         </div>
 
         {loadingPeople ? (
@@ -661,6 +774,90 @@ export default function UsersPage() {
           <p className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive" role="alert">
             {peopleError?.message ?? 'Unable to load users.'}
           </p>
+        ) : peopleList === 'deleted' ? (
+          <DataTable>
+            <DataTableToolbar
+              searchValue={tableSearch}
+              onSearchChange={(value) => {
+                setTableSearch(value)
+                setPage(1)
+              }}
+              searchPlaceholder="Search name, email, or role…"
+            />
+            <DataTableContent>
+              <table className="w-full min-w-[720px] caption-bottom text-left text-sm">
+                <thead className="border-b border-border/80 bg-muted/40 [&_tr]:border-0">
+                  <tr className="text-muted-foreground">
+                    <th className="h-11 px-4 align-middle font-medium lg:px-6">Name</th>
+                    <th className="h-11 px-4 align-middle font-medium lg:px-6">Email</th>
+                    <th className="h-11 px-4 align-middle font-medium lg:px-6">Role</th>
+                    <th className="h-11 px-4 align-middle font-medium lg:px-6">Deleted</th>
+                    <th className="h-11 w-36 px-2 align-middle text-right lg:px-3">
+                      <span className="sr-only">Actions</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/60 [&_tr:last-child]:border-0">
+                  {filteredDeletedRows.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="px-6 py-12 text-center text-muted-foreground">
+                        {deletedRows.length === 0
+                          ? 'No soft-deleted users.'
+                          : 'No results match your search.'}
+                      </td>
+                    </tr>
+                  ) : (
+                    paginatedDeletedRows.map((row) => {
+                      const displayName =
+                        [row.firstName, row.lastName].filter(Boolean).join(' ') || '—'
+                      const canPurge =
+                        canDeleteUsers &&
+                        row.uuid !== user?.uuid &&
+                        row.roleName !== SUPER_ADMIN_ROLE_NAME
+                      return (
+                        <tr key={row.key} className="hover:bg-muted/30">
+                          <td className="px-4 py-3 align-middle font-medium lg:px-6">
+                            {displayName}
+                          </td>
+                          <td className="px-4 py-3 align-middle text-muted-foreground lg:px-6">
+                            {row.email || '—'}
+                          </td>
+                          <td className="px-4 py-3 align-middle lg:px-6">{row.roleName || '—'}</td>
+                          <td className="px-4 py-3 align-middle text-muted-foreground lg:px-6">
+                            {formatShortDate(row.deletedAt)}
+                          </td>
+                          <td className="px-2 py-3 align-middle text-right lg:px-3">
+                            {canPurge ? (
+                              <Button
+                                type="button"
+                                variant="destructive"
+                                size="sm"
+                                className="h-8"
+                                disabled={permanentDeleteMutation.isPending}
+                                onClick={() => openPermanentDeleteConfirm(row)}
+                              >
+                                Delete forever
+                              </Button>
+                            ) : null}
+                          </td>
+                        </tr>
+                      )
+                    })
+                  )}
+                </tbody>
+              </table>
+            </DataTableContent>
+            <DataTablePagination
+              page={effectivePage}
+              pageSize={pageSize}
+              total={totalFiltered}
+              onPageChange={setPage}
+              onPageSizeChange={(size) => {
+                setPageSize(size)
+                setPage(1)
+              }}
+            />
+          </DataTable>
         ) : (
           <DataTable>
             <DataTableToolbar
@@ -948,215 +1145,181 @@ export default function UsersPage() {
         )}
       </section>
 
-      {inviteOpen ? (
-        <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-background/80 p-4 backdrop-blur-sm sm:items-center"
-          role="presentation"
-          onClick={closeInvite}
-        >
-          <Card
-            className="relative z-10 max-h-[90vh] w-full max-w-lg overflow-y-auto shadow-lg"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="invite-user-title"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <CardHeader>
-              <div className="flex items-start justify-between gap-4">
-                <div className="space-y-1">
-                  <div className="mb-2 flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                    <UserPlus className="size-5" aria-hidden />
-                  </div>
-                  <CardTitle id="invite-user-title">Invite user</CardTitle>
-                  <CardDescription>
-                    Send an email with a secure link. The recipient&apos;s address is fixed and
-                    pre-filled on the registration screen.
-                  </CardDescription>
-                </div>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="shrink-0"
-                  onClick={closeInvite}
-                  aria-label="Close"
-                  disabled={inviteMutation.isPending}
-                >
-                  <X className="size-4" aria-hidden />
-                </Button>
+      <Modal
+        open={inviteOpen}
+        onClose={closeInvite}
+        size="md"
+        closeDisabled={inviteMutation.isPending}
+        aria-labelledby="invite-user-title"
+      >
+        <ModalHeader
+          title={
+            <>
+              <div className="mb-2 flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <UserPlus className="size-5" aria-hidden />
               </div>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleInviteSubmit} className="space-y-4" noValidate>
-                {inviteErrors.root ? (
-                  <p
-                    className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
-                    role="alert"
-                  >
-                    {inviteErrors.root}
-                  </p>
-                ) : null}
-
-                <div className="space-y-2">
-                  <Label htmlFor="invite-email">Email</Label>
-                  <Input
-                    id="invite-email"
-                    type="email"
-                    autoComplete="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    aria-invalid={Boolean(inviteErrors.email)}
-                    disabled={inviteMutation.isPending}
-                  />
-                  {inviteErrors.email ? (
-                    <p className="text-sm text-destructive">{inviteErrors.email}</p>
-                  ) : null}
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="invite-role">Role</Label>
-                  <select
-                    id="invite-role"
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm"
-                    value={roleName}
-                    onChange={(e) => setRoleName(e.target.value)}
-                    disabled={inviteMutation.isPending}
-                  >
-                    {inviteRoleOptions.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
-                  <p className="text-xs text-muted-foreground">
-                    Students and instructors are directed to the Classroom app; admin staff use this
-                    portal.
-                  </p>
-                </div>
-
-                <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={closeInvite}
-                    disabled={inviteMutation.isPending}
-                  >
-                    Cancel
-                  </Button>
-                  <Button type="submit" disabled={inviteMutation.isPending}>
-                    {inviteMutation.isPending ? (
-                      <Loader2 className="size-4 animate-spin" aria-hidden />
-                    ) : null}
-                    Send invitation
-                  </Button>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
-        </div>
-      ) : null}
-
-      {editUser ? (
-        <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-background/80 p-4 backdrop-blur-sm sm:items-center"
-          role="presentation"
-          onClick={() => !adminUpdateMutation.isPending && setEditUser(null)}
+              Invite user
+            </>
+          }
+          description="Send an email with a secure link. The recipient's address is fixed and pre-filled on the registration screen."
+          titleId="invite-user-title"
+          onClose={closeInvite}
+          closeDisabled={inviteMutation.isPending}
+        />
+        <form
+          onSubmit={handleInviteSubmit}
+          className="flex min-h-0 flex-1 flex-col"
+          noValidate
         >
-          <Card
-            className="relative z-10 max-h-[min(92vh,100dvh-2rem)] w-full max-w-lg overflow-y-auto overscroll-contain shadow-lg"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="edit-user-title"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <CardHeader>
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <CardTitle id="edit-user-title">Edit user</CardTitle>
-                  <CardDescription>Update name and account status for this member.</CardDescription>
-                </div>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => !adminUpdateMutation.isPending && setEditUser(null)}
-                  aria-label="Close"
-                >
-                  <X className="size-4" aria-hidden />
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={submitEdit} className="space-y-4" noValidate>
-                {editErrors.root ? (
-                  <p
-                    className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
-                    role="alert"
-                  >
-                    {editErrors.root}
-                  </p>
-                ) : null}
-                <div className="space-y-2">
-                  <Label htmlFor="edit-first">First name</Label>
-                  <Input
-                    id="edit-first"
-                    value={editUser.firstName}
-                    onChange={(e) => setEditUser((s) => (s ? { ...s, firstName: e.target.value } : s))}
-                    aria-invalid={Boolean(editErrors.firstName)}
-                    disabled={adminUpdateMutation.isPending}
-                  />
-                  {editErrors.firstName ? (
-                    <p className="text-sm text-destructive">{editErrors.firstName}</p>
-                  ) : null}
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="edit-last">Last name</Label>
-                  <Input
-                    id="edit-last"
-                    value={editUser.lastName}
-                    onChange={(e) => setEditUser((s) => (s ? { ...s, lastName: e.target.value } : s))}
-                    disabled={adminUpdateMutation.isPending}
-                  />
-                </div>
-                {editUser.roleName === SUPER_ADMIN_ROLE_NAME ? (
-                  <p className="text-xs text-muted-foreground">
-                    Super Admin accounts cannot be deactivated from this screen.
-                  </p>
-                ) : (
-                  <label className="flex cursor-pointer items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      className="size-4 rounded border-input"
-                      checked={editUser.isActive}
-                      onChange={(e) =>
-                        setEditUser((s) => (s ? { ...s, isActive: e.target.checked } : s))
-                      }
-                      disabled={adminUpdateMutation.isPending}
-                    />
-                    Account active
-                  </label>
-                )}
-                <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setEditUser(null)}
-                    disabled={adminUpdateMutation.isPending}
-                  >
-                    Cancel
-                  </Button>
-                  <Button type="submit" disabled={adminUpdateMutation.isPending}>
-                    {adminUpdateMutation.isPending ? (
-                      <Loader2 className="size-4 animate-spin" aria-hidden />
-                    ) : null}
-                    Save
-                  </Button>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
-        </div>
-      ) : null}
+          <ModalBody className="space-y-4">
+            {inviteErrors.root ? (
+              <p
+                className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+                role="alert"
+              >
+                {inviteErrors.root}
+              </p>
+            ) : null}
+
+            <div className="space-y-2">
+              <Label htmlFor="invite-email">Email</Label>
+              <Input
+                id="invite-email"
+                type="email"
+                autoComplete="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                aria-invalid={Boolean(inviteErrors.email)}
+                disabled={inviteMutation.isPending}
+              />
+              {inviteErrors.email ? (
+                <p className="text-sm text-destructive">{inviteErrors.email}</p>
+              ) : null}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="invite-role">Role</Label>
+              <select
+                id="invite-role"
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm"
+                value={roleName}
+                onChange={(e) => setRoleName(e.target.value)}
+                disabled={inviteMutation.isPending}
+              >
+                {inviteRoleOptions.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-muted-foreground">
+                Students and instructors are directed to the Classroom app; admin staff use this
+                portal.
+              </p>
+            </div>
+          </ModalBody>
+          <ModalFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={closeInvite}
+              disabled={inviteMutation.isPending}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" disabled={inviteMutation.isPending}>
+              {inviteMutation.isPending ? (
+                <Loader2 className="size-4 animate-spin" aria-hidden />
+              ) : null}
+              Send invitation
+            </Button>
+          </ModalFooter>
+        </form>
+      </Modal>
+
+      <Modal
+        open={Boolean(editUser)}
+        onClose={() => setEditUser(null)}
+        size="md"
+        closeDisabled={adminUpdateMutation.isPending}
+        aria-labelledby="edit-user-title"
+      >
+        <ModalHeader
+          title="Edit user"
+          description="Update name and account status for this member."
+          titleId="edit-user-title"
+          onClose={() => setEditUser(null)}
+          closeDisabled={adminUpdateMutation.isPending}
+        />
+        <form onSubmit={submitEdit} className="flex min-h-0 flex-1 flex-col" noValidate>
+          <ModalBody className="space-y-4">
+            {editErrors.root ? (
+              <p
+                className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+                role="alert"
+              >
+                {editErrors.root}
+              </p>
+            ) : null}
+            <div className="space-y-2">
+              <Label htmlFor="edit-first">First name</Label>
+              <Input
+                id="edit-first"
+                value={editUser?.firstName ?? ''}
+                onChange={(e) => setEditUser((s) => (s ? { ...s, firstName: e.target.value } : s))}
+                aria-invalid={Boolean(editErrors.firstName)}
+                disabled={adminUpdateMutation.isPending}
+              />
+              {editErrors.firstName ? (
+                <p className="text-sm text-destructive">{editErrors.firstName}</p>
+              ) : null}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-last">Last name</Label>
+              <Input
+                id="edit-last"
+                value={editUser?.lastName ?? ''}
+                onChange={(e) => setEditUser((s) => (s ? { ...s, lastName: e.target.value } : s))}
+                disabled={adminUpdateMutation.isPending}
+              />
+            </div>
+            {editUser?.roleName === SUPER_ADMIN_ROLE_NAME ? (
+              <p className="text-xs text-muted-foreground">
+                Super Admin accounts cannot be deactivated from this screen.
+              </p>
+            ) : (
+              <label className="flex cursor-pointer items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  className="size-4 rounded border-input"
+                  checked={editUser?.isActive ?? false}
+                  onChange={(e) =>
+                    setEditUser((s) => (s ? { ...s, isActive: e.target.checked } : s))
+                  }
+                  disabled={adminUpdateMutation.isPending}
+                />
+                Account active
+              </label>
+            )}
+          </ModalBody>
+          <ModalFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setEditUser(null)}
+              disabled={adminUpdateMutation.isPending}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" disabled={adminUpdateMutation.isPending}>
+              {adminUpdateMutation.isPending ? (
+                <Loader2 className="size-4 animate-spin" aria-hidden />
+              ) : null}
+              Save
+            </Button>
+          </ModalFooter>
+        </form>
+      </Modal>
 
       <ClassroomImpersonateDialog
         target={classroomImpersonateTarget}
@@ -1172,161 +1335,126 @@ export default function UsersPage() {
         lockEmail={Boolean(grantAccessTarget?.email)}
       />
 
-      {auditorTarget ? (
-        <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-background/80 p-4 backdrop-blur-sm sm:items-center"
-          role="presentation"
-          onClick={() => !auditorMutation.isPending && setAuditorTarget(null)}
+      <Modal
+        open={Boolean(auditorTarget)}
+        onClose={() => setAuditorTarget(null)}
+        size="sm"
+        closeDisabled={auditorMutation.isPending}
+        aria-labelledby="assign-auditor-title"
+      >
+        <ModalHeader
+          title="Assign auditor"
+          description={
+            <>
+              Choose the admin who audits{' '}
+              <span className="font-medium text-foreground">{auditorTarget?.name}</span>&apos;s
+              data-entry work.
+            </>
+          }
+          titleId="assign-auditor-title"
+          onClose={() => setAuditorTarget(null)}
+          closeDisabled={auditorMutation.isPending}
+        />
+        <form
+          className="flex min-h-0 flex-1 flex-col"
+          onSubmit={(e) => {
+            e.preventDefault()
+            if (!auditorTarget) return
+            auditorMutation.mutate({
+              uuid: auditorTarget.uuid,
+              auditorUuid: auditorTarget.auditorUuid || null,
+            })
+          }}
         >
-          <Card
-            className="relative z-10 w-full max-w-md overflow-y-auto shadow-lg"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="assign-auditor-title"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <CardHeader>
-              <div className="flex items-start justify-between gap-4">
-                <div className="space-y-1">
-                  <CardTitle id="assign-auditor-title">Assign auditor</CardTitle>
-                  <CardDescription>
-                    Choose the admin who audits{' '}
-                    <span className="font-medium text-foreground">{auditorTarget.name}</span>&apos;s
-                    data-entry work.
-                  </CardDescription>
-                </div>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="shrink-0"
-                  onClick={() => setAuditorTarget(null)}
-                  aria-label="Close"
-                  disabled={auditorMutation.isPending}
-                >
-                  <X className="size-4" aria-hidden />
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <form
-                className="space-y-4"
-                onSubmit={(e) => {
-                  e.preventDefault()
-                  auditorMutation.mutate({
-                    uuid: auditorTarget.uuid,
-                    auditorUuid: auditorTarget.auditorUuid || null,
-                  })
-                }}
+          <ModalBody className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="assign-auditor-select">Auditor</Label>
+              <select
+                id="assign-auditor-select"
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm"
+                value={auditorTarget?.auditorUuid ?? ''}
+                onChange={(e) =>
+                  setAuditorTarget((s) =>
+                    s ? { ...s, auditorUuid: e.target.value || null } : s,
+                  )
+                }
+                disabled={auditorMutation.isPending || auditorsQuery.isLoading}
               >
-                <div className="space-y-2">
-                  <Label htmlFor="assign-auditor-select">Auditor</Label>
-                  <select
-                    id="assign-auditor-select"
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm"
-                    value={auditorTarget.auditorUuid ?? ''}
-                    onChange={(e) =>
-                      setAuditorTarget((s) =>
-                        s ? { ...s, auditorUuid: e.target.value || null } : s,
-                      )
-                    }
-                    disabled={auditorMutation.isPending || auditorsQuery.isLoading}
-                  >
-                    <option value="">Unassigned</option>
-                    {auditorOptions.map((opt) => (
-                      <option key={opt.uuid} value={opt.uuid}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
-                  {auditorsQuery.isLoading ? (
-                    <p className="text-xs text-muted-foreground">Loading auditors…</p>
-                  ) : null}
-                </div>
-                <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setAuditorTarget(null)}
-                    disabled={auditorMutation.isPending}
-                  >
-                    Cancel
-                  </Button>
-                  <Button type="submit" disabled={auditorMutation.isPending}>
-                    {auditorMutation.isPending ? (
-                      <Loader2 className="size-4 animate-spin" aria-hidden />
-                    ) : null}
-                    Save
-                  </Button>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
-        </div>
-      ) : null}
+                <option value="">Unassigned</option>
+                {auditorOptions.map((opt) => (
+                  <option key={opt.uuid} value={opt.uuid}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+              {auditorsQuery.isLoading ? (
+                <p className="text-xs text-muted-foreground">Loading auditors…</p>
+              ) : null}
+            </div>
+          </ModalBody>
+          <ModalFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setAuditorTarget(null)}
+              disabled={auditorMutation.isPending}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" disabled={auditorMutation.isPending}>
+              {auditorMutation.isPending ? (
+                <Loader2 className="size-4 animate-spin" aria-hidden />
+              ) : null}
+              Save
+            </Button>
+          </ModalFooter>
+        </form>
+      </Modal>
 
-      {cancelInviteTarget ? (
-        <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-background/80 p-4 backdrop-blur-sm sm:items-center"
-          role="presentation"
-          onClick={closeCancelInviteConfirm}
-        >
-          <Card
-            className="relative z-10 max-h-[min(92vh,100dvh-2rem)] w-full max-w-md overflow-y-auto overscroll-contain shadow-lg"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="cancel-invite-title"
-            onClick={(e) => e.stopPropagation()}
+      <Modal
+        open={Boolean(cancelInviteTarget)}
+        onClose={closeCancelInviteConfirm}
+        size="sm"
+        closeDisabled={cancelInviteMutation.isPending}
+        aria-labelledby="cancel-invite-title"
+      >
+        <ModalHeader
+          title="Cancel invitation?"
+          description={
+            <>
+              The signup link for{' '}
+              <span className="font-medium text-foreground">{cancelInviteTarget?.email}</span> will
+              stop working.
+            </>
+          }
+          titleId="cancel-invite-title"
+          onClose={closeCancelInviteConfirm}
+          closeDisabled={cancelInviteMutation.isPending}
+        />
+        <ModalFooter>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={closeCancelInviteConfirm}
+            disabled={cancelInviteMutation.isPending}
           >
-            <CardHeader>
-              <div className="flex items-start justify-between gap-4">
-                <div className="space-y-1">
-                  <CardTitle id="cancel-invite-title">Cancel invitation?</CardTitle>
-                  <CardDescription>
-                    The signup link for{' '}
-                    <span className="font-medium text-foreground">{cancelInviteTarget.email}</span>{' '}
-                    will stop working.
-                  </CardDescription>
-                </div>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="shrink-0"
-                  onClick={closeCancelInviteConfirm}
-                  aria-label="Close"
-                  disabled={cancelInviteMutation.isPending}
-                >
-                  <X className="size-4" aria-hidden />
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={closeCancelInviteConfirm}
-                  disabled={cancelInviteMutation.isPending}
-                >
-                  Keep invitation
-                </Button>
-                <Button
-                  type="button"
-                  variant="destructive"
-                  onClick={() => cancelInviteMutation.mutate(cancelInviteTarget.uuid)}
-                  disabled={cancelInviteMutation.isPending}
-                >
-                  {cancelInviteMutation.isPending ? (
-                    <Loader2 className="size-4 animate-spin" aria-hidden />
-                  ) : null}
-                  Cancel invitation
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      ) : null}
+            Keep invitation
+          </Button>
+          <Button
+            type="button"
+            variant="destructive"
+            onClick={() => {
+              if (cancelInviteTarget) cancelInviteMutation.mutate(cancelInviteTarget.uuid)
+            }}
+            disabled={cancelInviteMutation.isPending}
+          >
+            {cancelInviteMutation.isPending ? (
+              <Loader2 className="size-4 animate-spin" aria-hidden />
+            ) : null}
+            Cancel invitation
+          </Button>
+        </ModalFooter>
+      </Modal>
 
       <DeleteConfirmDialog
         open={Boolean(deleteUserTarget)}
@@ -1342,8 +1470,8 @@ export default function UsersPage() {
                   (<span className="font-medium text-foreground">{deleteUserTarget.email}</span>)
                 </>
               ) : null}{' '}
-              from the directory? They will be signed out and hidden from Users. The account is
-              soft-deleted, not permanently erased.
+              from the directory? They will be signed out and moved to Deleted users. The email
+              stays reserved and their role cannot be removed until you delete them forever.
             </>
           ) : null
         }
@@ -1353,6 +1481,33 @@ export default function UsersPage() {
           if (deleteUserTarget) deleteUserMutation.mutate(deleteUserTarget.uuid)
         }}
         onClose={closeDeleteUserConfirm}
+      />
+
+      <DeleteConfirmDialog
+        open={Boolean(permanentDeleteTarget)}
+        title="Delete user forever?"
+        description={
+          permanentDeleteTarget ? (
+            <>
+              Permanently erase{' '}
+              <span className="font-medium text-foreground">{permanentDeleteTarget.name}</span>
+              {permanentDeleteTarget.email ? (
+                <>
+                  {' '}
+                  (<span className="font-medium text-foreground">{permanentDeleteTarget.email}</span>)
+                </>
+              ) : null}
+              ? This cannot be undone. Their email can be used to sign up again, and their role can
+              be deleted if no other users remain on it.
+            </>
+          ) : null
+        }
+        confirmLabel="Delete forever"
+        loading={permanentDeleteMutation.isPending}
+        onConfirm={() => {
+          if (permanentDeleteTarget) permanentDeleteMutation.mutate(permanentDeleteTarget.uuid)
+        }}
+        onClose={closePermanentDeleteConfirm}
       />
     </div>
   )
