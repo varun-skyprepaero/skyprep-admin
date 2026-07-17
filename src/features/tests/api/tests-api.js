@@ -161,6 +161,16 @@ export async function deleteTestQuestion(uuid) {
   return unwrap(res)
 }
 
+/**
+ * Dependency counts for the delete confirmation dialog.
+ * @param {string} entityType
+ * @param {string} uuid
+ */
+export async function fetchDeleteImpact(entityType, uuid) {
+  const res = await apiClient.get(`/bank/delete-impact/${encodeURIComponent(entityType)}/${encodeURIComponent(uuid)}`)
+  return unwrap(res).impact
+}
+
 export async function fetchTestPackages(catalogKind) {
   const res = await apiClient.get('/bank/packages', {
     params: catalogKind ? { catalogKind } : undefined,
