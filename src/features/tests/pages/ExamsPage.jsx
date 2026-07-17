@@ -12,7 +12,7 @@ import {
   Target,
   Trash2,
 } from 'lucide-react'
-import { DeleteConfirmDialog } from '@/components/ui/delete-confirm-dialog'
+import { TestBankDeleteDialog } from '@/features/tests/components/TestBankDeleteDialog'
 import { Modal, ModalBody, ModalFooter, ModalHeader } from '@/components/ui/modal'
 import { Button } from '@/components/ui/button'
 import {
@@ -1122,19 +1122,14 @@ export default function ExamsPage() {
         </Modal>
       ) : null}
 
-      <DeleteConfirmDialog
-        open={Boolean(deleteTarget)}
+      <TestBankDeleteDialog
+        entityType="exam"
         title="Delete exam?"
-        description={
-          deleteTarget ? (
-            <>
-              Delete <span className="font-medium text-foreground">{deleteTarget.label}</span>? This
-              cannot be undone.
-            </>
-          ) : null
-        }
-        loading={deleteMu.isPending}
+        deleteTarget={deleteTarget}
+        deletePending={deleteMu.isPending}
         onClose={() => setDeleteTarget(null)}
+        onEdit={() => setDeleteTarget(null)}
+        editLabel="Keep editing"
         onConfirm={() => deleteTarget && deleteMu.mutate(deleteTarget.uuid)}
       />
     </div>

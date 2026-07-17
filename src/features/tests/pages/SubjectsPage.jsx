@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Loader2, Plus } from 'lucide-react'
-import { DeleteConfirmDialog } from '@/components/ui/delete-confirm-dialog'
+import { TestBankDeleteDialog } from '@/features/tests/components/TestBankDeleteDialog'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -203,7 +203,7 @@ export default function TestsSubjectsPage() {
                                 destructive: true,
                                 disabled: deleteMu.isPending,
                                 onClick: () =>
-                                  setDeleteTarget({ uuid: row.uuid, label: row.name }),
+                                  setDeleteTarget({ uuid: row.uuid, label: row.name, row }),
                               },
                             ]}
                           />
@@ -276,19 +276,17 @@ export default function TestsSubjectsPage() {
         </Modal>
       ) : null}
 
-      <DeleteConfirmDialog
-        open={Boolean(deleteTarget)}
+      <TestBankDeleteDialog
+        entityType="subject"
         title="Delete subject?"
-        description={
-          deleteTarget ? (
-            <>
-              Delete <span className="font-medium text-foreground">{deleteTarget.label}</span>? This
-              cannot be undone.
-            </>
-          ) : null
-        }
-        loading={deleteMu.isPending}
+        deleteTarget={deleteTarget}
+        deletePending={deleteMu.isPending}
         onClose={() => setDeleteTarget(null)}
+        onEdit={() => {
+          const row = deleteTarget?.row
+          setDeleteTarget(null)
+          if (row) openEdit(row)
+        }}
         onConfirm={() => deleteTarget && deleteMu.mutate(deleteTarget.uuid)}
       />
     </div>
