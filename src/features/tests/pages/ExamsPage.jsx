@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueries, useQueryClient } from '@tanstack/react-query'
 import {
   ChevronRight,
@@ -441,6 +442,7 @@ function draftFromExam(exam) {
 
 export default function ExamsPage() {
   const queryClient = useQueryClient()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [selectedUuid, setSelectedUuid] = useState(null)
   const [draft, setDraft] = useState(null)
   const [createOpen, setCreateOpen] = useState(false)
@@ -454,6 +456,18 @@ export default function ExamsPage() {
     queryKey: examsQk,
     queryFn: () => fetchTestExams(),
   })
+
+  const editParam = searchParams.get('edit')
+  useEffect(() => {
+    if (!editParam || !exams.length) return
+    const match = exams.find((exam) => exam.uuid === editParam)
+    if (!match) return
+    setSelectedUuid(match.uuid)
+    const next = new URLSearchParams(searchParams)
+    next.delete('edit')
+    setSearchParams(next, { replace: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editParam, exams])
 
   const { data: boards = [] } = useQuery({
     queryKey: ['tests', 'boards'],
