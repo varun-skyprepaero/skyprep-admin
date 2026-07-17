@@ -403,7 +403,7 @@ export default function UsersPage() {
   const inviteMutation = useMutation({
     mutationFn: () =>
       createInvitation({
-        email: email.trim(),
+        email: email.trim().toLowerCase(),
         roleName,
       }),
     onSuccess: (response) => {
