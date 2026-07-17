@@ -1,14 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Loader2, X } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card'
+import { Modal, ModalBody, ModalFooter, ModalHeader } from '@/components/ui/modal'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { CLASSROOM_APP_ROLE_NAMES } from '@/features/invitations/constants'
@@ -187,217 +181,198 @@ export function GrantAccessDialog({
     onError: (err) => notifyError(handleApiError(err).message),
   })
 
-  if (!open) return null
+  function close() {
+    onOpenChange(false)
+  }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-background/80 p-4 backdrop-blur-sm sm:items-center"
-      role="presentation"
-      onClick={() => !grantMu.isPending && onOpenChange(false)}
+    <Modal
+      open={open}
+      onClose={close}
+      size="md"
+      closeDisabled={grantMu.isPending}
+      aria-labelledby="grant-access-title"
     >
-      <Card
-        className="relative z-10 max-h-[90vh] w-full max-w-lg overflow-y-auto shadow-lg"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="grant-access-title"
-        onClick={(e) => e.stopPropagation()}
+      <ModalHeader
+        title="Grant complimentary access"
+        description="Give a signed-up student access to test series, question bank, or both without payment. Useful for influencers, partners, or trials. The student must already have a Classroom account."
+        titleId="grant-access-title"
+        onClose={close}
+        closeDisabled={grantMu.isPending}
+      />
+      <form
+        onSubmit={(e) => {
+          e.preventDefault()
+          if (!studentEmailValid) {
+            notifyError('Select a student from the list')
+            return
+          }
+          grantMu.mutate()
+        }}
+        className="flex min-h-0 flex-1 flex-col"
       >
-        <CardHeader>
-          <div className="flex items-start justify-between gap-4">
-            <div className="space-y-1">
-              <CardTitle id="grant-access-title">Grant complimentary access</CardTitle>
-              <CardDescription>
-                Give a signed-up student access to test series, question bank, or both without
-                payment. Useful for influencers, partners, or trials. The student must already have
-                a Classroom account.
-              </CardDescription>
-            </div>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="shrink-0"
-              onClick={() => onOpenChange(false)}
-              aria-label="Close"
-              disabled={grantMu.isPending}
-            >
-              <X className="size-4" aria-hidden />
-            </Button>
-          </div>
-        </CardHeader>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault()
-            if (!studentEmailValid) {
-              notifyError('Select a student from the list')
-              return
-            }
-            grantMu.mutate()
-          }}
-        >
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="grant-email">Student</Label>
-              <StudentSearchField
-                id="grant-email"
-                value={form.email}
-                onChange={(email) => setForm((s) => ({ ...s, email, planKey: '' }))}
-                users={studentOptions}
-                disabled={grantMu.isPending || usersLoading}
-                readOnly={lockEmail}
-              />
-              <p className="text-xs text-muted-foreground">
-                {usersLoading
-                  ? 'Loading students…'
-                  : 'Search by name or email. User not listed? They need to sign up in Classroom first, or use Invite user on the Users page.'}
-              </p>
-              {studentEmailValid && trimmedEmail && grantPreviewLoading ? (
-                <p className="text-xs text-muted-foreground">Checking current access…</p>
-              ) : null}
-              {grantPreview?.activeSubscription?.plan ? (
-                <p className="text-xs text-muted-foreground">
-                  Current plan:{' '}
-                  <span className="font-medium text-foreground">
-                    {grantPreview.activeSubscription.plan.label}
-                  </span>
-                  {grantPreview.entitlements?.length ? (
-                    <>
-                      {' '}
-                      · Includes{' '}
-                      {formatEntitlementLabels(grantPreview.entitlements, entitlementProducts)}
-                    </>
-                  ) : null}
-                </p>
-              ) : grantPreview && studentEmailValid ? (
-                <p className="text-xs text-muted-foreground">No active membership yet.</p>
-              ) : null}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="grant-plan">Access plan</Label>
-              <select
-                id="grant-plan"
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                value={form.planKey}
-                onChange={(e) => setForm((s) => ({ ...s, planKey: e.target.value }))}
-                required
-                disabled={
-                  grantMu.isPending ||
-                  plansLoading ||
-                  grantPreviewLoading ||
-                  !studentEmailValid ||
-                  grantablePlans.length === 0
-                }
-              >
-                <option value="">
-                  {!studentEmailValid
-                    ? 'Select a student first…'
-                    : grantPreviewLoading
-                      ? 'Checking access…'
-                      : grantablePlans.length === 0
-                        ? 'No plans available for this student'
-                        : 'Select plan…'}
-                </option>
-                {grantablePlans.map((plan) => (
-                  <option key={plan.uuid} value={plan.planKey}>
-                    {plan.label} · {formatMarket(plan.market)} · {formatInterval(plan.interval)}
-                    {Array.isArray(plan.entitlements) && plan.entitlements.length > 0
-                      ? ` · ${formatEntitlementLabels(plan.entitlements, entitlementProducts)}`
-                      : ''}
-                  </option>
-                ))}
-              </select>
-              {studentEmailValid &&
-              grantPreview &&
-              !grantPreviewLoading &&
-              grantablePlans.length === 0 ? (
-                <p className="text-xs text-amber-700 dark:text-amber-400">
-                  This student already has access from their current plan. Choose a different student
-                  or change their subscription on the Subscribers page first.
-                </p>
-              ) : selectedPlan ? (
-                <p className="text-xs text-muted-foreground">
-                  Unlocks:{' '}
-                  <span className="font-medium text-foreground">
-                    {formatEntitlementLabels(selectedPlan.entitlements, entitlementProducts)}
-                  </span>
-                  . Create complimentary plans under Subscription → Plans if needed.
-                </p>
-              ) : (
-                <p className="text-xs text-muted-foreground">
-                  Pick a plan that includes test series, question bank, or both. Create internal
-                  complimentary plans in Subscription → Plans for campaigns.
-                </p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="grant-duration">Access duration</Label>
-              <select
-                id="grant-duration"
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                value={form.durationPreset}
-                onChange={(e) => setForm((s) => ({ ...s, durationPreset: e.target.value }))}
-                disabled={grantMu.isPending}
-              >
-                {DURATION_PRESETS.map((preset) => (
-                  <option key={preset.value} value={preset.value}>
-                    {preset.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {form.durationPreset === 'custom' ? (
-              <div className="space-y-2">
-                <Label htmlFor="grant-end">Custom period end</Label>
-                <Input
-                  id="grant-end"
-                  type="datetime-local"
-                  value={form.customPeriodEnd}
-                  onChange={(e) => setForm((s) => ({ ...s, customPeriodEnd: e.target.value }))}
-                  required
-                  disabled={grantMu.isPending}
-                />
-              </div>
+        <ModalBody className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="grant-email">Student</Label>
+            <StudentSearchField
+              id="grant-email"
+              value={form.email}
+              onChange={(email) => setForm((s) => ({ ...s, email, planKey: '' }))}
+              users={studentOptions}
+              disabled={grantMu.isPending || usersLoading}
+              readOnly={lockEmail}
+            />
+            <p className="text-xs text-muted-foreground">
+              {usersLoading
+                ? 'Loading students…'
+                : 'Search by name or email. User not listed? They need to sign up in Classroom first, or use Invite user on the Users page.'}
+            </p>
+            {studentEmailValid && trimmedEmail && grantPreviewLoading ? (
+              <p className="text-xs text-muted-foreground">Checking current access…</p>
             ) : null}
+            {grantPreview?.activeSubscription?.plan ? (
+              <p className="text-xs text-muted-foreground">
+                Current plan:{' '}
+                <span className="font-medium text-foreground">
+                  {grantPreview.activeSubscription.plan.label}
+                </span>
+                {grantPreview.entitlements?.length ? (
+                  <>
+                    {' '}
+                    · Includes{' '}
+                    {formatEntitlementLabels(grantPreview.entitlements, entitlementProducts)}
+                  </>
+                ) : null}
+              </p>
+            ) : grantPreview && studentEmailValid ? (
+              <p className="text-xs text-muted-foreground">No active membership yet.</p>
+            ) : null}
+          </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="grant-reason">Campaign note (optional)</Label>
-              <Input
-                id="grant-reason"
-                value={form.reason}
-                onChange={(e) => setForm((s) => ({ ...s, reason: e.target.value }))}
-                placeholder="e.g. Influencer campaign – March 2026"
-                disabled={grantMu.isPending}
-              />
-            </div>
-          </CardContent>
-          <div className="flex flex-col-reverse gap-2 border-t p-4 sm:flex-row sm:justify-end">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-              disabled={grantMu.isPending}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
+          <div className="space-y-2">
+            <Label htmlFor="grant-plan">Access plan</Label>
+            <select
+              id="grant-plan"
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              value={form.planKey}
+              onChange={(e) => setForm((s) => ({ ...s, planKey: e.target.value }))}
+              required
               disabled={
                 grantMu.isPending ||
                 plansLoading ||
                 grantPreviewLoading ||
                 !studentEmailValid ||
-                !planSelectionValid
+                grantablePlans.length === 0
               }
             >
-              {grantMu.isPending ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
-              Grant access
-            </Button>
+              <option value="">
+                {!studentEmailValid
+                  ? 'Select a student first…'
+                  : grantPreviewLoading
+                    ? 'Checking access…'
+                    : grantablePlans.length === 0
+                      ? 'No plans available for this student'
+                      : 'Select plan…'}
+              </option>
+              {grantablePlans.map((plan) => (
+                <option key={plan.uuid} value={plan.planKey}>
+                  {plan.label} · {formatMarket(plan.market)} · {formatInterval(plan.interval)}
+                  {Array.isArray(plan.entitlements) && plan.entitlements.length > 0
+                    ? ` · ${formatEntitlementLabels(plan.entitlements, entitlementProducts)}`
+                    : ''}
+                </option>
+              ))}
+            </select>
+            {studentEmailValid &&
+            grantPreview &&
+            !grantPreviewLoading &&
+            grantablePlans.length === 0 ? (
+              <p className="text-xs text-amber-700 dark:text-amber-400">
+                This student already has access from their current plan. Choose a different student
+                or change their subscription on the Subscribers page first.
+              </p>
+            ) : selectedPlan ? (
+              <p className="text-xs text-muted-foreground">
+                Unlocks:{' '}
+                <span className="font-medium text-foreground">
+                  {formatEntitlementLabels(selectedPlan.entitlements, entitlementProducts)}
+                </span>
+                . Create complimentary plans under Subscription → Plans if needed.
+              </p>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Pick a plan that includes test series, question bank, or both. Create internal
+                complimentary plans in Subscription → Plans for campaigns.
+              </p>
+            )}
           </div>
-        </form>
-      </Card>
-    </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="grant-duration">Access duration</Label>
+            <select
+              id="grant-duration"
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              value={form.durationPreset}
+              onChange={(e) => setForm((s) => ({ ...s, durationPreset: e.target.value }))}
+              disabled={grantMu.isPending}
+            >
+              {DURATION_PRESETS.map((preset) => (
+                <option key={preset.value} value={preset.value}>
+                  {preset.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {form.durationPreset === 'custom' ? (
+            <div className="space-y-2">
+              <Label htmlFor="grant-end">Custom period end</Label>
+              <Input
+                id="grant-end"
+                type="datetime-local"
+                value={form.customPeriodEnd}
+                onChange={(e) => setForm((s) => ({ ...s, customPeriodEnd: e.target.value }))}
+                required
+                disabled={grantMu.isPending}
+              />
+            </div>
+          ) : null}
+
+          <div className="space-y-2">
+            <Label htmlFor="grant-reason">Campaign note (optional)</Label>
+            <Input
+              id="grant-reason"
+              value={form.reason}
+              onChange={(e) => setForm((s) => ({ ...s, reason: e.target.value }))}
+              placeholder="e.g. Influencer campaign – March 2026"
+              disabled={grantMu.isPending}
+            />
+          </div>
+        </ModalBody>
+        <ModalFooter>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={close}
+            disabled={grantMu.isPending}
+          >
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            disabled={
+              grantMu.isPending ||
+              plansLoading ||
+              grantPreviewLoading ||
+              !studentEmailValid ||
+              !planSelectionValid
+            }
+          >
+            {grantMu.isPending ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
+            Grant access
+          </Button>
+        </ModalFooter>
+      </form>
+    </Modal>
   )
 }

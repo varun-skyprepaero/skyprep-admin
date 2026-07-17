@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Loader2, X } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Modal, ModalBody, ModalFooter, ModalHeader } from '@/components/ui/modal'
 import { DataTable, DataTableContent } from '@/components/ui/data-table'
 import { Label } from '@/components/ui/label'
 import {
@@ -107,132 +108,114 @@ function PayoutDialog({ author, onClose, onPaid }) {
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-background/80 p-4 backdrop-blur-sm sm:items-center"
-      role="presentation"
-      onClick={onClose}
+    <Modal
+      open
+      onClose={onClose}
+      size="lg"
+      closeDisabled={mutation.isPending}
+      aria-labelledby="payout-dialog-title"
     >
-      <Card
-        className="relative z-10 flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden shadow-lg"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="payout-dialog-title"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <CardHeader className="pb-3">
-          <div className="flex items-start justify-between gap-2">
-            <div>
-              <CardTitle id="payout-dialog-title">Pay {author.author?.name ?? 'author'}</CardTitle>
-              <CardDescription>
-                {author.author?.email ?? author.authorUuid} · {items.length} payable item
-                {items.length === 1 ? '' : 's'}
-              </CardDescription>
-            </div>
-            <button
+      <ModalHeader
+        title={`Pay ${author.author?.name ?? 'author'}`}
+        description={`${author.author?.email ?? author.authorUuid} · ${items.length} payable item${items.length === 1 ? '' : 's'}`}
+        titleId="payout-dialog-title"
+        onClose={onClose}
+        closeDisabled={mutation.isPending}
+      />
+      <ModalBody>
+        {entriesQuery.isLoading ? (
+          <div className="flex justify-center py-12">
+            <Loader2 className="size-8 animate-spin text-primary" aria-hidden />
+          </div>
+        ) : entriesQuery.isError ? (
+          <p className="text-sm text-destructive">
+            {entriesQuery.error?.message ?? 'Unable to load payable entries'}
+          </p>
+        ) : items.length === 0 ? (
+          <p className="py-8 text-center text-sm text-muted-foreground">
+            No accepted, unpaid entries for this person.
+          </p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="border-b bg-muted/40 text-xs uppercase text-muted-foreground">
+                <tr>
+                  <th className="w-10 px-3 py-2">
+                    <input
+                      type="checkbox"
+                      checked={allSelected}
+                      onChange={toggleAll}
+                      aria-label="Select all"
+                    />
+                  </th>
+                  <th className="px-3 py-2 font-medium">Type</th>
+                  <th className="px-3 py-2 font-medium">Item</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((item) => {
+                  const key = itemKey(item)
+                  return (
+                    <tr key={key} className="border-b border-border/60 last:border-0">
+                      <td className="px-3 py-2">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(selected[key])}
+                          onChange={() => toggle(item)}
+                          aria-label={`Select ${item.title || item.uuid}`}
+                        />
+                      </td>
+                      <td className="px-3 py-2 text-xs">{entityLabel(item)}</td>
+                      <td className="max-w-sm px-3 py-2">
+                        <span className="line-clamp-2">{item.title || item.uuid}</span>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </ModalBody>
+      {items.length > 0 ? (
+        <ModalFooter className="flex-col items-stretch gap-4">
+          <div>
+            <Label htmlFor="payout-note">Note (optional)</Label>
+            <textarea
+              id="payout-note"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              rows={2}
+              placeholder="e.g. July payout"
+              className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            />
+          </div>
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button
               type="button"
-              onClick={onClose}
-              className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-              aria-label="Close"
+              variant="outline"
+              disabled={mutation.isPending || selectedKeys.length === 0}
+              onClick={() => mutation.mutate({ all: false })}
             >
-              <X className="size-5" aria-hidden />
-            </button>
+              {mutation.isPending ? (
+                <Loader2 className="mr-2 size-4 animate-spin" aria-hidden />
+              ) : null}
+              Mark selected paid ({selectedKeys.length})
+            </Button>
+            <Button
+              type="button"
+              disabled={mutation.isPending}
+              onClick={() => mutation.mutate({ all: true })}
+            >
+              {mutation.isPending ? (
+                <Loader2 className="mr-2 size-4 animate-spin" aria-hidden />
+              ) : null}
+              Mark all payable paid ({items.length})
+            </Button>
           </div>
-        </CardHeader>
-        <CardContent className="flex-1 overflow-y-auto">
-          {entriesQuery.isLoading ? (
-            <div className="flex justify-center py-12">
-              <Loader2 className="size-8 animate-spin text-primary" aria-hidden />
-            </div>
-          ) : entriesQuery.isError ? (
-            <p className="text-sm text-destructive">
-              {entriesQuery.error?.message ?? 'Unable to load payable entries'}
-            </p>
-          ) : items.length === 0 ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">
-              No accepted, unpaid entries for this person.
-            </p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead className="border-b bg-muted/40 text-xs uppercase text-muted-foreground">
-                  <tr>
-                    <th className="w-10 px-3 py-2">
-                      <input
-                        type="checkbox"
-                        checked={allSelected}
-                        onChange={toggleAll}
-                        aria-label="Select all"
-                      />
-                    </th>
-                    <th className="px-3 py-2 font-medium">Type</th>
-                    <th className="px-3 py-2 font-medium">Item</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {items.map((item) => {
-                    const key = itemKey(item)
-                    return (
-                      <tr key={key} className="border-b border-border/60 last:border-0">
-                        <td className="px-3 py-2">
-                          <input
-                            type="checkbox"
-                            checked={Boolean(selected[key])}
-                            onChange={() => toggle(item)}
-                            aria-label={`Select ${item.title || item.uuid}`}
-                          />
-                        </td>
-                        <td className="px-3 py-2 text-xs">{entityLabel(item)}</td>
-                        <td className="max-w-sm px-3 py-2">
-                          <span className="line-clamp-2">{item.title || item.uuid}</span>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </CardContent>
-        {items.length > 0 ? (
-          <div className="border-t bg-muted/20 px-6 py-4">
-            <div className="mb-3">
-              <Label htmlFor="payout-note">Note (optional)</Label>
-              <textarea
-                id="payout-note"
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                rows={2}
-                placeholder="e.g. July payout"
-                className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-              />
-            </div>
-            <div className="flex flex-wrap justify-end gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                disabled={mutation.isPending || selectedKeys.length === 0}
-                onClick={() => mutation.mutate({ all: false })}
-              >
-                {mutation.isPending ? (
-                  <Loader2 className="mr-2 size-4 animate-spin" aria-hidden />
-                ) : null}
-                Mark selected paid ({selectedKeys.length})
-              </Button>
-              <Button
-                type="button"
-                disabled={mutation.isPending}
-                onClick={() => mutation.mutate({ all: true })}
-              >
-                {mutation.isPending ? (
-                  <Loader2 className="mr-2 size-4 animate-spin" aria-hidden />
-                ) : null}
-                Mark all payable paid ({items.length})
-              </Button>
-            </div>
-          </div>
-        ) : null}
-      </Card>
-    </div>
+        </ModalFooter>
+      ) : null}
+    </Modal>
   )
 }
 

@@ -5,11 +5,11 @@ import { DeleteConfirmDialog } from '@/components/ui/delete-confirm-dialog'
 import { Button } from '@/components/ui/button'
 import {
   Card,
-  CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
+import { Modal, ModalBody, ModalFooter, ModalHeader } from '@/components/ui/modal'
 import {
   DataTable,
   DataTableActionsHeader,
@@ -220,65 +220,60 @@ export default function TestsSubjectsPage() {
       </Card>
 
       {dialog ? (
-        <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-background/80 p-4 backdrop-blur-sm sm:items-center"
-          role="presentation"
-          onClick={() => !createMu.isPending && !updateMu.isPending && setDialog(null)}
+        <Modal
+          open
+          onClose={() => setDialog(null)}
+          size="md"
+          closeDisabled={createMu.isPending || updateMu.isPending}
+          aria-labelledby="subject-dialog-title"
         >
-          <Card
-            className="relative z-10 max-h-[90vh] w-full max-w-lg overflow-y-auto shadow-lg"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="subject-dialog-title"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <CardHeader>
-              <CardTitle id="subject-dialog-title">
-                {dialog.mode === 'create' ? 'New subject' : 'Edit subject'}
-              </CardTitle>
-              <CardDescription>Display name and optional description.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form className="space-y-4" onSubmit={submit}>
-                <div className="space-y-2">
-                  <Label htmlFor="sub-name">Name</Label>
-                  <Input
-                    id="sub-name"
-                    value={form.name}
-                    onChange={(e) => setForm((s) => ({ ...s, name: e.target.value }))}
-                    disabled={createMu.isPending || updateMu.isPending}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="sub-desc">Description</Label>
-                  <Input
-                    id="sub-desc"
-                    value={form.description}
-                    onChange={(e) => setForm((s) => ({ ...s, description: e.target.value }))}
-                    disabled={createMu.isPending || updateMu.isPending}
-                  />
-                </div>
-                <div className="flex justify-end gap-2 pt-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setDialog(null)}
-                    disabled={createMu.isPending || updateMu.isPending}
-                  >
-                    Cancel
-                  </Button>
-                  <Button type="submit" disabled={createMu.isPending || updateMu.isPending}>
-                    {(createMu.isPending || updateMu.isPending) && (
-                      <Loader2 className="size-4 animate-spin" aria-hidden />
-                    )}
-                    Save
-                  </Button>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
-        </div>
+          <ModalHeader
+            title={dialog.mode === 'create' ? 'New subject' : 'Edit subject'}
+            description="Display name and optional description."
+            titleId="subject-dialog-title"
+            onClose={() => setDialog(null)}
+            closeDisabled={createMu.isPending || updateMu.isPending}
+          />
+          <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col">
+            <ModalBody className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="sub-name">Name</Label>
+                <Input
+                  id="sub-name"
+                  value={form.name}
+                  onChange={(e) => setForm((s) => ({ ...s, name: e.target.value }))}
+                  disabled={createMu.isPending || updateMu.isPending}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="sub-desc">Description</Label>
+                <Input
+                  id="sub-desc"
+                  value={form.description}
+                  onChange={(e) => setForm((s) => ({ ...s, description: e.target.value }))}
+                  disabled={createMu.isPending || updateMu.isPending}
+                />
+              </div>
+            </ModalBody>
+            <ModalFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setDialog(null)}
+                disabled={createMu.isPending || updateMu.isPending}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={createMu.isPending || updateMu.isPending}>
+                {(createMu.isPending || updateMu.isPending) && (
+                  <Loader2 className="size-4 animate-spin" aria-hidden />
+                )}
+                Save
+              </Button>
+            </ModalFooter>
+          </form>
+        </Modal>
       ) : null}
 
       <DeleteConfirmDialog
