@@ -93,6 +93,8 @@ export function PackageSeriesFormDialog({
       size="xl"
       closeDisabled={busy}
       aria-labelledby="pkg-dialog-title"
+      // Scroll the whole card (sticky header/footer) so filter toggles don't leave a flex-1 dead gap.
+      className="overflow-auto overscroll-contain"
     >
       <ModalHeader
         title={
@@ -112,10 +114,11 @@ export function PackageSeriesFormDialog({
         titleId="pkg-dialog-title"
         onClose={onClose}
         closeDisabled={busy}
+        className="sticky top-0 z-10 bg-card/95 backdrop-blur-sm"
       />
 
-        <form onSubmit={onSubmit} className="flex min-h-0 flex-1 flex-col">
-          <ModalBody className="space-y-5">
+        <form onSubmit={onSubmit}>
+          <ModalBody className="flex-none space-y-5 overflow-visible">
             <div className="space-y-5">
             <FormSection title="Basics" description="How this series appears in the student catalog.">
               <div className="space-y-2">
@@ -443,7 +446,7 @@ export function PackageSeriesFormDialog({
             </div>
           </ModalBody>
 
-          <ModalFooter>
+          <ModalFooter className="sticky bottom-0 z-10 bg-card/95 backdrop-blur-sm">
             <Button type="button" variant="outline" onClick={onClose} disabled={busy}>
               Cancel
             </Button>

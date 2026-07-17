@@ -1,7 +1,11 @@
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { usesChoiceOptionsList } from '@/features/tests/lib/question-form-options'
+import {
+  choiceLabelAt,
+  usesChoiceOptionsList,
+  withSequentialChoiceLabels,
+} from '@/features/tests/lib/question-form-options'
 
 /**
  * @param {{
@@ -105,19 +109,20 @@ export function QuestionAnswerFields({ type, options, onChange, disabled = false
   }
 
   function addOption() {
-    const idx = options.length
-    onChange([
-      ...options,
-      {
-        label: String.fromCharCode(65 + idx),
-        text: '',
-        isCorrect: false,
-      },
-    ])
+    onChange(
+      withSequentialChoiceLabels([
+        ...options,
+        {
+          label: choiceLabelAt(options.length),
+          text: '',
+          isCorrect: false,
+        },
+      ]),
+    )
   }
 
   function removeOption(index) {
-    onChange(options.filter((_, i) => i !== index))
+    onChange(withSequentialChoiceLabels(options.filter((_, i) => i !== index)))
   }
 
   return (
@@ -130,52 +135,54 @@ export function QuestionAnswerFields({ type, options, onChange, disabled = false
       </div>
       <p className="text-xs text-muted-foreground">
         {singleCorrect
-          ? 'Mark exactly one option as correct.'
-          : 'Mark all options that are correct (select all that apply).'}
+          ? 'Mark exactly one option as correct. Labels are assigned automatically (A, B, C…).'
+          : 'Mark all options that are correct (select all that apply). Labels are assigned automatically (A, B, C…).'}
       </p>
       <div className="space-y-2">
-        {options.map((opt, idx) => (
-          <div
-            key={idx}
-            className="flex flex-wrap items-start gap-2 border-t border-border/60 pt-2 first:border-0 first:pt-0"
-          >
-            <Input
-              className="w-14"
-              value={opt.label}
-              onChange={(e) => updateOption(idx, { label: e.target.value })}
-              disabled={disabled}
-              aria-label={`Option ${idx + 1} label`}
-            />
-            <Input
-              className="min-w-[12rem] flex-1"
-              placeholder="Answer text"
-              value={opt.text}
-              onChange={(e) => updateOption(idx, { text: e.target.value })}
-              disabled={disabled}
-            />
-            <label className="flex items-center gap-1.5 text-xs whitespace-nowrap">
-              <input
-                type={singleCorrect ? 'radio' : 'checkbox'}
-                name={singleCorrect ? 'single-correct' : undefined}
-                className="size-4 accent-primary"
-                checked={opt.isCorrect}
-                onChange={() => setCorrect(idx)}
+        {options.map((opt, idx) => {
+          const label = choiceLabelAt(idx)
+          return (
+            <div
+              key={idx}
+              className="flex flex-wrap items-start gap-2 border-t border-border/60 pt-2 first:border-0 first:pt-0"
+            >
+              <span
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-input bg-muted/40 text-sm font-medium"
+                aria-label={`Option ${label}`}
+              >
+                {label}
+              </span>
+              <Input
+                className="min-w-[12rem] flex-1"
+                placeholder="Answer text"
+                value={opt.text}
+                onChange={(e) => updateOption(idx, { text: e.target.value })}
                 disabled={disabled}
               />
-              Correct
-            </label>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="text-destructive"
-              onClick={() => removeOption(idx)}
-              disabled={disabled || options.length <= 2}
-            >
-              Remove
-            </Button>
-          </div>
-        ))}
+              <label className="flex items-center gap-1.5 text-xs whitespace-nowrap">
+                <input
+                  type={singleCorrect ? 'radio' : 'checkbox'}
+                  name={singleCorrect ? 'single-correct' : undefined}
+                  className="size-4 accent-primary"
+                  checked={opt.isCorrect}
+                  onChange={() => setCorrect(idx)}
+                  disabled={disabled}
+                />
+                Correct
+              </label>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="text-destructive"
+                onClick={() => removeOption(idx)}
+                disabled={disabled || options.length <= 2}
+              >
+                Remove
+              </Button>
+            </div>
+          )
+        })}
       </div>
     </div>
   )

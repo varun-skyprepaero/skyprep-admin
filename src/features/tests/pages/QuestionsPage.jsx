@@ -6,11 +6,11 @@ import { DeleteConfirmDialog } from '@/components/ui/delete-confirm-dialog'
 import { Button } from '@/components/ui/button'
 import {
   Card,
-  CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
+import { Modal, ModalBody, ModalFooter, ModalHeader } from '@/components/ui/modal'
 import {
   DataTable,
   DataTableActionsHeader,
@@ -172,10 +172,20 @@ export default function TestsQuestionsPage() {
         explanation: form.explanation.trim() || null,
         options: buildOptionsPayload(form.type, form),
       }),
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       notifySuccess('Question created')
       void queryClient.invalidateQueries({ queryKey: qkQ })
       void queryClient.invalidateQueries({ queryKey: qkSubjects })
+      if (variables?.addAnother) {
+        setForm((s) => ({
+          ...s,
+          difficulty: 'EASY',
+          stem: '',
+          explanation: '',
+          options: optionsForQuestionType(s.type),
+        }))
+        return
+      }
       setDialog(null)
     },
     onError: (err) => {
@@ -328,14 +338,14 @@ export default function TestsQuestionsPage() {
     }))
   }
 
-  function submit(e) {
+  function submit(e, { addAnother = false } = {}) {
     e.preventDefault()
     const validationError = validateQuestionAnswers(form.type, form)
     if (validationError) {
       notifyError(validationError)
       return
     }
-    if (dialog?.mode === 'create') createMu.mutate()
+    if (dialog?.mode === 'create') createMu.mutate({ addAnother })
     else if (dialog?.mode === 'edit') updateMu.mutate()
   }
 
@@ -551,41 +561,47 @@ export default function TestsQuestionsPage() {
       </Card>
 
       {dialog ? (
-        <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-background/80 p-4 backdrop-blur-sm sm:items-center"
-          role="presentation"
-          onClick={() => !createMu.isPending && !updateMu.isPending && setDialog(null)}
+        <Modal
+          open
+          onClose={() => setDialog(null)}
+          size="lg"
+          closeDisabled={createMu.isPending || updateMu.isPending}
+          aria-labelledby="question-dialog-title"
         >
-          <Card
-            className="relative z-10 max-h-[92vh] w-full max-w-2xl overflow-y-auto shadow-lg"
-            role="dialog"
-            aria-modal="true"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <CardHeader>
-              <CardTitle>
-                {dialog.mode === 'create'
-                  ? 'New question'
-                  : dialog.mode === 'view'
-                    ? 'Question'
-                    : 'Edit question'}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {dialog.mode === 'view' ? (
-                <div className="space-y-4">
-                  <QuestionViewContent question={dialog.row} />
-                  <div className="flex justify-end gap-2 pt-2">
-                    <Button type="button" variant="outline" onClick={() => openEdit(dialog.row)}>
-                      Edit
-                    </Button>
-                    <Button type="button" onClick={() => setDialog(null)}>
-                      Close
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-              <form className="space-y-4" onSubmit={submit}>
+          <ModalHeader
+            title={
+              dialog.mode === 'create'
+                ? 'New question'
+                : dialog.mode === 'view'
+                  ? 'Question'
+                  : 'Edit question'
+            }
+            description={
+              dialog.mode === 'view'
+                ? 'Review question details, scoring, and answer options.'
+                : 'Question text, scoring, difficulty, and answer options.'
+            }
+            titleId="question-dialog-title"
+            onClose={() => setDialog(null)}
+            closeDisabled={createMu.isPending || updateMu.isPending}
+          />
+          {dialog.mode === 'view' ? (
+            <>
+              <ModalBody>
+                <QuestionViewContent question={dialog.row} />
+              </ModalBody>
+              <ModalFooter>
+                <Button type="button" variant="outline" onClick={() => openEdit(dialog.row)}>
+                  Edit
+                </Button>
+                <Button type="button" onClick={() => setDialog(null)}>
+                  Close
+                </Button>
+              </ModalFooter>
+            </>
+          ) : (
+            <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col">
+              <ModalBody className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="q-subject">Subject</Label>
                   <select
@@ -724,28 +740,40 @@ export default function TestsQuestionsPage() {
                   disabled={createMu.isPending || updateMu.isPending}
                   onChange={(options) => setForm((s) => ({ ...s, options }))}
                 />
-
-                <div className="flex justify-end gap-2 pt-2">
+              </ModalBody>
+              <ModalFooter className="flex-wrap">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setDialog(null)}
+                  disabled={createMu.isPending || updateMu.isPending}
+                >
+                  Cancel
+                </Button>
+                {dialog.mode === 'create' ? (
                   <Button
                     type="button"
-                    variant="outline"
-                    onClick={() => setDialog(null)}
+                    variant="secondary"
                     disabled={createMu.isPending || updateMu.isPending}
+                    onClick={(e) => submit(e, { addAnother: true })}
                   >
-                    Cancel
-                  </Button>
-                  <Button type="submit" disabled={createMu.isPending || updateMu.isPending}>
-                    {(createMu.isPending || updateMu.isPending) && (
+                    {createMu.isPending && createMu.variables?.addAnother ? (
                       <Loader2 className="size-4 animate-spin" aria-hidden />
-                    )}
-                    Save
+                    ) : null}
+                    Save & add another
                   </Button>
-                </div>
-              </form>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+                ) : null}
+                <Button type="submit" disabled={createMu.isPending || updateMu.isPending}>
+                  {(createMu.isPending || updateMu.isPending) &&
+                  !(dialog.mode === 'create' && createMu.variables?.addAnother) ? (
+                    <Loader2 className="size-4 animate-spin" aria-hidden />
+                  ) : null}
+                  Save
+                </Button>
+              </ModalFooter>
+            </form>
+          )}
+        </Modal>
       ) : null}
 
       <DeleteConfirmDialog

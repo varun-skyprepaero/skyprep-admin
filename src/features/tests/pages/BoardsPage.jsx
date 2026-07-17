@@ -6,11 +6,11 @@ import { DeleteConfirmDialog } from '@/components/ui/delete-confirm-dialog'
 import { Button } from '@/components/ui/button'
 import {
   Card,
-  CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
+import { Modal, ModalBody, ModalFooter, ModalHeader } from '@/components/ui/modal'
 import {
   DataTable,
   DataTableActionsHeader,
@@ -388,82 +388,74 @@ export default function TestsBoardsPage() {
       </Card>
 
       {dialog ? (
-        <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-background/80 p-4 backdrop-blur-sm sm:items-center"
-          role="presentation"
-          onClick={() => !busy && setDialog(null)}
+        <Modal
+          open
+          onClose={() => setDialog(null)}
+          size="lg"
+          closeDisabled={busy}
+          aria-labelledby="board-dialog-title"
         >
-          <Card
-            className="relative z-10 max-h-[90vh] w-full max-w-xl overflow-y-auto shadow-lg"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="board-dialog-title"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <CardHeader>
-              <CardTitle id="board-dialog-title">
-                {dialog.mode === 'create' ? 'New board' : 'Edit board'}
-              </CardTitle>
-              <CardDescription>
-                Board details plus which licenses from the catalog belong to this board.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form className="space-y-5" onSubmit={submit}>
-                <div className="space-y-2">
-                  <Label htmlFor="board-code">Code</Label>
-                  <Input
-                    id="board-code"
-                    value={form.code}
-                    onChange={(e) =>
-                      setForm((s) => ({ ...s, code: normalizeBoardCode(e.target.value) }))
-                    }
-                    disabled={busy}
-                    placeholder="DGCA"
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="board-name">Name</Label>
-                  <Input
-                    id="board-name"
-                    value={form.name}
-                    onChange={(e) => setForm((s) => ({ ...s, name: e.target.value }))}
-                    disabled={busy}
-                    placeholder="Directorate General of Civil Aviation"
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="board-desc">Description</Label>
-                  <Input
-                    id="board-desc"
-                    value={form.description}
-                    onChange={(e) => setForm((s) => ({ ...s, description: e.target.value }))}
-                    disabled={busy}
-                  />
-                </div>
-
-                <BoardSuitePicker
-                  suites={allSuites}
-                  selectedUuids={form.suiteUuids}
+          <ModalHeader
+            title={dialog.mode === 'create' ? 'New board' : 'Edit board'}
+            description="Board details plus which licenses from the catalog belong to this board."
+            titleId="board-dialog-title"
+            onClose={() => setDialog(null)}
+            closeDisabled={busy}
+          />
+          <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col">
+            <ModalBody className="space-y-5">
+              <div className="space-y-2">
+                <Label htmlFor="board-code">Code</Label>
+                <Input
+                  id="board-code"
+                  value={form.code}
+                  onChange={(e) =>
+                    setForm((s) => ({ ...s, code: normalizeBoardCode(e.target.value) }))
+                  }
                   disabled={busy}
-                  onToggle={toggleSuite}
+                  placeholder="DGCA"
+                  required
                 />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="board-name">Name</Label>
+                <Input
+                  id="board-name"
+                  value={form.name}
+                  onChange={(e) => setForm((s) => ({ ...s, name: e.target.value }))}
+                  disabled={busy}
+                  placeholder="Directorate General of Civil Aviation"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="board-desc">Description</Label>
+                <Input
+                  id="board-desc"
+                  value={form.description}
+                  onChange={(e) => setForm((s) => ({ ...s, description: e.target.value }))}
+                  disabled={busy}
+                />
+              </div>
 
-                <div className="flex justify-end gap-2 pt-2">
-                  <Button type="button" variant="outline" onClick={() => setDialog(null)} disabled={busy}>
-                    Cancel
-                  </Button>
-                  <Button type="submit" disabled={busy}>
-                    {busy && <Loader2 className="size-4 animate-spin" aria-hidden />}
-                    Save
-                  </Button>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
-        </div>
+              <BoardSuitePicker
+                suites={allSuites}
+                selectedUuids={form.suiteUuids}
+                disabled={busy}
+                onToggle={toggleSuite}
+              />
+            </ModalBody>
+            <ModalFooter>
+              <Button type="button" variant="outline" onClick={() => setDialog(null)} disabled={busy}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={busy}>
+                {busy && <Loader2 className="size-4 animate-spin" aria-hidden />}
+                Save
+              </Button>
+            </ModalFooter>
+          </form>
+        </Modal>
       ) : null}
 
       <DeleteConfirmDialog

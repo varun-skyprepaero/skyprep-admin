@@ -5,11 +5,11 @@ import { DeleteConfirmDialog } from '@/components/ui/delete-confirm-dialog'
 import { Button } from '@/components/ui/button'
 import {
   Card,
-  CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
+import { Modal, ModalBody, ModalFooter, ModalHeader } from '@/components/ui/modal'
 import {
   DataTable,
   DataTableActionsHeader,
@@ -234,80 +234,76 @@ export default function TestsSuitesPage() {
       </Card>
 
       {dialog ? (
-        <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-background/80 p-4 backdrop-blur-sm sm:items-center"
-          role="presentation"
-          onClick={() => !createMu.isPending && !updateMu.isPending && setDialog(null)}
+        <Modal
+          open
+          onClose={() => setDialog(null)}
+          size="md"
+          closeDisabled={createMu.isPending || updateMu.isPending}
         >
-          <Card
-            className="relative z-10 max-h-[90vh] w-full max-w-lg overflow-y-auto shadow-lg"
-            role="dialog"
-            aria-modal="true"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <CardHeader>
-              <CardTitle>{dialog.mode === 'create' ? 'New license' : 'Edit license'}</CardTitle>
-              <CardDescription>Name and description only. Link to boards from the Boards page.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form className="space-y-4" onSubmit={submit}>
-                <div className="space-y-2">
-                  <Label htmlFor="suite-name">Name</Label>
-                  <Input
-                    id="suite-name"
-                    value={form.name}
-                    onChange={(e) => setForm((s) => ({ ...s, name: e.target.value }))}
-                    disabled={createMu.isPending || updateMu.isPending}
-                    required
-                    placeholder="e.g. PPL, CPL, ATPL"
-                  />
-                  {dialog.mode === 'create' ? (
-                    slugPreview ? (
-                      <p className="text-xs text-muted-foreground">
-                        Slug: <span className="font-mono text-foreground">{slugPreview}</span>
-                      </p>
-                    ) : (
-                      <p className="text-xs text-muted-foreground">
-                        A slug is created automatically from the name.
-                      </p>
-                    )
+          <ModalHeader
+            title={dialog.mode === 'create' ? 'New license' : 'Edit license'}
+            description="Name and description only. Link to boards from the Boards page."
+            onClose={() => setDialog(null)}
+            closeDisabled={createMu.isPending || updateMu.isPending}
+          />
+          <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col">
+            <ModalBody className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="suite-name">Name</Label>
+                <Input
+                  id="suite-name"
+                  value={form.name}
+                  onChange={(e) => setForm((s) => ({ ...s, name: e.target.value }))}
+                  disabled={createMu.isPending || updateMu.isPending}
+                  required
+                  placeholder="e.g. PPL, CPL, ATPL"
+                />
+                {dialog.mode === 'create' ? (
+                  slugPreview ? (
+                    <p className="text-xs text-muted-foreground">
+                      Slug: <span className="font-mono text-foreground">{slugPreview}</span>
+                    </p>
                   ) : (
-                    <div className="rounded-lg border border-dashed border-border bg-muted/30 px-3 py-2">
-                      <p className="text-xs text-muted-foreground">Slug (fixed after creation)</p>
-                      <p className="font-mono text-sm">{dialog.slug}</p>
-                    </div>
-                  )}
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="suite-desc">Description</Label>
-                  <textarea
-                    id="suite-desc"
-                    className="min-h-[72px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm"
-                    value={form.description}
-                    onChange={(e) => setForm((s) => ({ ...s, description: e.target.value }))}
-                    disabled={createMu.isPending || updateMu.isPending}
-                  />
-                </div>
-                <div className="flex justify-end gap-2 pt-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setDialog(null)}
-                    disabled={createMu.isPending || updateMu.isPending}
-                  >
-                    Cancel
-                  </Button>
-                  <Button type="submit" disabled={createMu.isPending || updateMu.isPending}>
-                    {(createMu.isPending || updateMu.isPending) && (
-                      <Loader2 className="size-4 animate-spin" aria-hidden />
-                    )}
-                    Save
-                  </Button>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
-        </div>
+                    <p className="text-xs text-muted-foreground">
+                      A slug is created automatically from the name.
+                    </p>
+                  )
+                ) : (
+                  <div className="rounded-lg border border-dashed border-border bg-muted/30 px-3 py-2">
+                    <p className="text-xs text-muted-foreground">Slug (fixed after creation)</p>
+                    <p className="font-mono text-sm">{dialog.slug}</p>
+                  </div>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="suite-desc">Description</Label>
+                <textarea
+                  id="suite-desc"
+                  className="min-h-[72px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm"
+                  value={form.description}
+                  onChange={(e) => setForm((s) => ({ ...s, description: e.target.value }))}
+                  disabled={createMu.isPending || updateMu.isPending}
+                />
+              </div>
+            </ModalBody>
+            <ModalFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setDialog(null)}
+                disabled={createMu.isPending || updateMu.isPending}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={createMu.isPending || updateMu.isPending}>
+                {(createMu.isPending || updateMu.isPending) && (
+                  <Loader2 className="size-4 animate-spin" aria-hidden />
+                )}
+                Save
+              </Button>
+            </ModalFooter>
+          </form>
+        </Modal>
       ) : null}
 
       <DeleteConfirmDialog

@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
-import { Loader2, Pencil } from 'lucide-react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Loader2, Pencil, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import {
@@ -10,11 +10,37 @@ import {
   DataTablePagination,
   dataTableSelectClass,
 } from '@/components/ui/data-table'
+import { DeleteConfirmDialog } from '@/components/ui/delete-confirm-dialog'
 import { fetchMyEntries } from '@/features/review/api/review-api'
 import { ReviewStatusBadge } from '@/features/review/components/review-status-badge'
 import { PaymentStatusBadge } from '@/features/review/components/payment-status-badge'
-import { REVIEW_ENTITY_LABELS, reviewEntityEditHref } from '@/features/review/constants'
+import {
+  REVIEW_ENTITY_LABELS,
+  isReviewEntryDeleteDisabled,
+  reviewEntityEditHref,
+} from '@/features/review/constants'
+import {
+  deleteTestBoard,
+  deleteTestBook,
+  deleteTestExam,
+  deleteTestLesson,
+  deleteTestQuestion,
+  deleteTestSubject,
+  deleteTestSuite,
+} from '@/features/tests/api/tests-api'
 import { usePaginatedRows } from '@/hooks/use-paginated-rows'
+import { handleApiError } from '@/lib/http/api-error'
+import { notifyError, notifySuccess } from '@/lib/notifications'
+
+const DELETE_BY_ENTITY = {
+  question: deleteTestQuestion,
+  exam: deleteTestExam,
+  subject: deleteTestSubject,
+  book: deleteTestBook,
+  lesson: deleteTestLesson,
+  board: deleteTestBoard,
+  suite: deleteTestSuite,
+}
 
 function formatDate(value) {
   if (!value) return '—'
@@ -44,12 +70,34 @@ function StatCard({ label, value, accent }) {
 }
 
 export function MyEntriesTab() {
+  const queryClient = useQueryClient()
   const [typeFilter, setTypeFilter] = useState('')
   const [paymentFilter, setPaymentFilter] = useState('')
+  const [deleteTarget, setDeleteTarget] = useState(
+    /** @type {{ entityType: string, uuid: string, label: string } | null} */ (null),
+  )
 
   const query = useQuery({
     queryKey: ['review', 'my-entries'],
     queryFn: () => fetchMyEntries(),
+  })
+
+  const deleteMu = useMutation({
+    mutationFn: ({ entityType, uuid }) => {
+      const deleteFn = DELETE_BY_ENTITY[entityType]
+      if (!deleteFn) throw new Error(`Unable to delete ${entityType}`)
+      return deleteFn(uuid)
+    },
+    onSuccess: () => {
+      notifySuccess('Entry deleted')
+      void queryClient.invalidateQueries({ queryKey: ['review', 'my-entries'] })
+      void queryClient.invalidateQueries({ queryKey: ['review'] })
+      setDeleteTarget(null)
+    },
+    onError: (err) => {
+      const { message } = handleApiError(err, 'Unable to delete entry')
+      notifyError(message)
+    },
   })
 
   const items = query.data?.items ?? []
@@ -157,6 +205,14 @@ export function MyEntriesTab() {
                     ) : (
                       paginatedRows.map((item) => {
                         const editHref = reviewEntityEditHref(item.entityType, item.uuid)
+                        const canDelete =
+                          Boolean(DELETE_BY_ENTITY[item.entityType]) &&
+                          !isReviewEntryDeleteDisabled(item)
+                        const deleteDisabledReason = isReviewEntryDeleteDisabled(item)
+                          ? item.reviewStatus === 'ACCEPTED'
+                            ? 'Accepted entries cannot be deleted'
+                            : 'Paid entries cannot be deleted'
+                          : undefined
                         return (
                           <tr
                             key={`${item.entityType}:${item.uuid}`}
@@ -176,22 +232,44 @@ export function MyEntriesTab() {
                               {formatDate(item.createdAt)}
                             </td>
                             <td className="px-4 py-3 text-right">
-                              {editHref ? (
-                                <Button
-                                  asChild
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  className="h-8 gap-1.5"
-                                >
-                                  <Link to={editHref}>
-                                    <Pencil className="size-3.5" aria-hidden />
-                                    Edit
-                                  </Link>
-                                </Button>
-                              ) : (
-                                <span className="text-xs text-muted-foreground">—</span>
-                              )}
+                              <div className="inline-flex items-center justify-end gap-2">
+                                {editHref ? (
+                                  <Button
+                                    asChild
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-8 gap-1.5"
+                                  >
+                                    <Link to={editHref}>
+                                      <Pencil className="size-3.5" aria-hidden />
+                                      Edit
+                                    </Link>
+                                  </Button>
+                                ) : null}
+                                {DELETE_BY_ENTITY[item.entityType] ? (
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-8 gap-1.5"
+                                    disabled={!canDelete}
+                                    title={deleteDisabledReason}
+                                    onClick={() =>
+                                      setDeleteTarget({
+                                        entityType: item.entityType,
+                                        uuid: item.uuid,
+                                        label: item.title || item.uuid,
+                                      })
+                                    }
+                                  >
+                                    <Trash2 className="size-3.5" aria-hidden />
+                                    Delete
+                                  </Button>
+                                ) : !editHref ? (
+                                  <span className="text-xs text-muted-foreground">—</span>
+                                ) : null}
+                              </div>
                             </td>
                           </tr>
                         )
@@ -207,6 +285,28 @@ export function MyEntriesTab() {
           ) : null}
         </DataTable>
       </Card>
+
+      <DeleteConfirmDialog
+        open={Boolean(deleteTarget)}
+        title="Delete entry?"
+        description={
+          deleteTarget ? (
+            <>
+              Delete <span className="font-medium text-foreground">{deleteTarget.label}</span>? This
+              cannot be undone.
+            </>
+          ) : null
+        }
+        loading={deleteMu.isPending}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={() =>
+          deleteTarget &&
+          deleteMu.mutate({
+            entityType: deleteTarget.entityType,
+            uuid: deleteTarget.uuid,
+          })
+        }
+      />
 
       <Card>
         <CardHeader className="pb-4">

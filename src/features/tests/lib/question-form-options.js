@@ -1,5 +1,19 @@
 /** @typedef {{ label: string, text: string, isCorrect: boolean }} FormOption */
 
+/** @param {number} idx */
+export function choiceLabelAt(idx) {
+  return String.fromCharCode(65 + idx)
+}
+
+/**
+ * Re-letter choice options as A, B, C… by position.
+ * @param {FormOption[]} options
+ * @returns {FormOption[]}
+ */
+export function withSequentialChoiceLabels(options) {
+  return options.map((o, idx) => ({ ...o, label: choiceLabelAt(idx) }))
+}
+
 export function defaultChoiceOptions() {
   return [
     { label: 'A', text: '', isCorrect: true },
@@ -37,19 +51,23 @@ export function optionsForQuestionType(type, existing) {
     case 'ESSAY':
       return []
     case 'MULTIPLE_CHOICE':
-      return prev.length >= 2 ? prev.map((o) => ({ ...o })) : defaultChoiceOptions()
+      return withSequentialChoiceLabels(
+        prev.length >= 2 ? prev.map((o) => ({ ...o })) : defaultChoiceOptions(),
+      )
     case 'SINGLE_CHOICE':
     default: {
       const base = prev.length >= 2 ? prev.map((o) => ({ ...o })) : defaultChoiceOptions()
       let hasCorrect = false
-      return base.map((o) => {
-        if (!o.isCorrect) return o
-        if (!hasCorrect) {
-          hasCorrect = true
-          return o
-        }
-        return { ...o, isCorrect: false }
-      })
+      return withSequentialChoiceLabels(
+        base.map((o) => {
+          if (!o.isCorrect) return o
+          if (!hasCorrect) {
+            hasCorrect = true
+            return o
+          }
+          return { ...o, isCorrect: false }
+        }),
+      )
     }
   }
 }
@@ -74,7 +92,7 @@ export function buildOptionsPayload(type, form) {
       return []
     default:
       return form.options.map((o, idx) => ({
-        label: o.label?.trim() || String.fromCharCode(65 + idx),
+        label: choiceLabelAt(idx),
         text: String(o.text ?? '').trim(),
         isCorrect: Boolean(o.isCorrect),
       }))
