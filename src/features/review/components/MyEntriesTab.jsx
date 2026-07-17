@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Loader2, Pencil, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -10,7 +10,6 @@ import {
   DataTablePagination,
   dataTableSelectClass,
 } from '@/components/ui/data-table'
-import { DeleteConfirmDialog } from '@/components/ui/delete-confirm-dialog'
 import { fetchMyEntries } from '@/features/review/api/review-api'
 import { ReviewStatusBadge } from '@/features/review/components/review-status-badge'
 import { PaymentStatusBadge } from '@/features/review/components/payment-status-badge'
@@ -28,6 +27,7 @@ import {
   deleteTestSubject,
   deleteTestSuite,
 } from '@/features/tests/api/tests-api'
+import { TestBankDeleteDialog } from '@/features/tests/components/TestBankDeleteDialog'
 import { usePaginatedRows } from '@/hooks/use-paginated-rows'
 import { handleApiError } from '@/lib/http/api-error'
 import { notifyError, notifySuccess } from '@/lib/notifications'
@@ -70,6 +70,7 @@ function StatCard({ label, value, accent }) {
 }
 
 export function MyEntriesTab() {
+  const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [typeFilter, setTypeFilter] = useState('')
   const [paymentFilter, setPaymentFilter] = useState('')
@@ -286,19 +287,21 @@ export function MyEntriesTab() {
         </DataTable>
       </Card>
 
-      <DeleteConfirmDialog
-        open={Boolean(deleteTarget)}
+      <TestBankDeleteDialog
+        entityType={deleteTarget?.entityType ?? 'question'}
         title="Delete entry?"
-        description={
-          deleteTarget ? (
-            <>
-              Delete <span className="font-medium text-foreground">{deleteTarget.label}</span>? This
-              cannot be undone.
-            </>
-          ) : null
-        }
-        loading={deleteMu.isPending}
+        deleteTarget={deleteTarget}
+        deletePending={deleteMu.isPending}
         onClose={() => setDeleteTarget(null)}
+        onEdit={
+          deleteTarget && reviewEntityEditHref(deleteTarget.entityType, deleteTarget.uuid)
+            ? () => {
+                const href = reviewEntityEditHref(deleteTarget.entityType, deleteTarget.uuid)
+                setDeleteTarget(null)
+                if (href) navigate(href)
+              }
+            : null
+        }
         onConfirm={() =>
           deleteTarget &&
           deleteMu.mutate({

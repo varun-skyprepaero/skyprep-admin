@@ -13,6 +13,7 @@ import { Modal, ModalBody, ModalFooter, ModalHeader } from '@/components/ui/moda
  *   confirmVariant?: 'destructive' | 'secondary' | 'default',
  *   loading?: boolean,
  *   confirmDisabled?: boolean,
+ *   secondaryAction?: { label: string, onClick: () => void } | null,
  *   onConfirm: () => void,
  *   onClose: () => void,
  * }} props
@@ -27,6 +28,7 @@ export function ActionConfirmDialog({
   confirmVariant = 'destructive',
   loading = false,
   confirmDisabled = false,
+  secondaryAction = null,
   onConfirm,
   onClose,
 }) {
@@ -50,10 +52,26 @@ export function ActionConfirmDialog({
         closeDisabled={loading}
       />
       {children ? <ModalBody className="space-y-4">{children}</ModalBody> : null}
-      <ModalFooter>
-        <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
-          {cancelLabel}
-        </Button>
+      <ModalFooter
+        className={
+          secondaryAction ? 'flex-wrap sm:justify-between' : undefined
+        }
+      >
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
+            {cancelLabel}
+          </Button>
+          {secondaryAction ? (
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={secondaryAction.onClick}
+              disabled={loading}
+            >
+              {secondaryAction.label}
+            </Button>
+          ) : null}
+        </div>
         <Button
           type="button"
           variant={confirmVariant}
