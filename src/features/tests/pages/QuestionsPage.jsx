@@ -28,7 +28,6 @@ import { QuestionAnswerFields } from '@/features/tests/components/QuestionAnswer
 import { DIFFICULTY_OPTIONS, QUESTION_TYPE_OPTIONS } from '@/features/tests/constants'
 import {
   buildOptionsPayload,
-  defaultChoiceOptions,
   optionsForQuestionType,
   validateQuestionAnswers,
 } from '@/features/tests/lib/question-form-options'
@@ -62,6 +61,86 @@ const qkBooks = ['tests', 'books']
 const qkLessons = ['tests', 'lessons']
 const qkBoards = ['tests', 'boards']
 const qkSuites = ['tests', 'suites']
+const QUESTION_CREATE_PREFERENCES_KEY = 'skyprep:questions:create-preferences'
+
+function defaultQuestionCreatePreferences() {
+  return {
+    subjectUuid: '',
+    bookUuids: [],
+    lessonUuids: [],
+    boardUuids: [],
+    suiteUuids: [],
+    type: 'SINGLE_CHOICE',
+    difficulty: 'MEDIUM',
+    score: '1',
+  }
+}
+
+function questionCreatePreferencesKey(userUuid) {
+  return `${QUESTION_CREATE_PREFERENCES_KEY}:${userUuid || 'staff'}`
+}
+
+function readQuestionCreatePreferences(userUuid) {
+  const defaults = defaultQuestionCreatePreferences()
+  if (typeof window === 'undefined') return defaults
+
+  try {
+    const parsed = JSON.parse(
+      window.sessionStorage.getItem(questionCreatePreferencesKey(userUuid)) ?? '{}',
+    )
+    const validType = QUESTION_TYPE_OPTIONS.some((option) => option.value === parsed.type)
+    const validDifficulty = DIFFICULTY_OPTIONS.some(
+      (option) => option.value === parsed.difficulty,
+    )
+
+    return {
+      subjectUuid: typeof parsed.subjectUuid === 'string' ? parsed.subjectUuid : '',
+      bookUuids: Array.isArray(parsed.bookUuids) ? parsed.bookUuids.filter(Boolean) : [],
+      lessonUuids: Array.isArray(parsed.lessonUuids) ? parsed.lessonUuids.filter(Boolean) : [],
+      boardUuids: Array.isArray(parsed.boardUuids) ? parsed.boardUuids.filter(Boolean) : [],
+      suiteUuids: Array.isArray(parsed.suiteUuids) ? parsed.suiteUuids.filter(Boolean) : [],
+      type: validType ? parsed.type : defaults.type,
+      difficulty: validDifficulty ? parsed.difficulty : defaults.difficulty,
+      score:
+        typeof parsed.score === 'string' && parsed.score.trim() ? parsed.score : defaults.score,
+    }
+  } catch {
+    return defaults
+  }
+}
+
+function writeQuestionCreatePreferences(userUuid, form) {
+  if (typeof window === 'undefined') return
+
+  const preferences = {
+    subjectUuid: form.subjectUuid,
+    bookUuids: form.bookUuids,
+    lessonUuids: form.lessonUuids,
+    boardUuids: form.boardUuids,
+    suiteUuids: form.suiteUuids,
+    type: form.type,
+    difficulty: form.difficulty,
+    score: form.score,
+  }
+
+  try {
+    window.sessionStorage.setItem(
+      questionCreatePreferencesKey(userUuid),
+      JSON.stringify(preferences),
+    )
+  } catch {
+    // Storage can be unavailable in restricted browser contexts; creation still works in memory.
+  }
+}
+
+function emptyQuestionForm(preferences = defaultQuestionCreatePreferences()) {
+  return {
+    ...preferences,
+    stem: '',
+    explanation: '',
+    options: optionsForQuestionType(preferences.type),
+  }
+}
 
 export default function TestsQuestionsPage() {
   const queryClient = useQueryClient()
@@ -80,19 +159,12 @@ export default function TestsQuestionsPage() {
   )
   const [dialog, setDialog] = useState(null)
   const [deleteTarget, setDeleteTarget] = useState(/** @type {{ uuid: string, label: string } | null} */ (null))
-  const [form, setForm] = useState({
-    subjectUuid: '',
-    bookUuids: [],
-    lessonUuids: [],
-    boardUuids: [],
-    suiteUuids: [],
-    type: 'SINGLE_CHOICE',
-    difficulty: 'MEDIUM',
-    score: '1',
-    stem: '',
-    explanation: '',
-    options: defaultChoiceOptions(),
-  })
+  const [form, setForm] = useState(() => emptyQuestionForm())
+
+  useEffect(() => {
+    if (dialog?.mode !== 'create') return
+    writeQuestionCreatePreferences(user?.uuid, form)
+  }, [dialog?.mode, form, user?.uuid])
 
   const { data: subjects = [] } = useQuery({
     queryKey: qkSubjects,
@@ -179,7 +251,6 @@ export default function TestsQuestionsPage() {
       if (variables?.addAnother) {
         setForm((s) => ({
           ...s,
-          difficulty: 'EASY',
           stem: '',
           explanation: '',
           options: optionsForQuestionType(s.type),
@@ -281,19 +352,13 @@ export default function TestsQuestionsPage() {
   })
 
   function openCreate() {
-    setForm({
-      subjectUuid: subjectFilter || '',
-      bookUuids: [],
-      lessonUuids: [],
-      boardUuids: [],
-      suiteUuids: [],
-      type: 'SINGLE_CHOICE',
-      difficulty: 'MEDIUM',
-      score: '1',
-      stem: '',
-      explanation: '',
-      options: defaultChoiceOptions(),
-    })
+    const preferences = readQuestionCreatePreferences(user?.uuid)
+    if (subjectFilter && subjectFilter !== FILTER_NO_LESSON) {
+      preferences.subjectUuid = subjectFilter
+      preferences.bookUuids = []
+      preferences.lessonUuids = []
+    }
+    setForm(emptyQuestionForm(preferences))
     setDialog({ mode: 'create' })
   }
 
