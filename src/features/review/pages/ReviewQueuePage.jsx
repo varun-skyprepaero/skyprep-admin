@@ -20,6 +20,7 @@ import {
 import { fetchTestQuestion } from '@/features/tests/api/tests-api'
 import { ReviewStatusBadge } from '@/features/review/components/review-status-badge'
 import { ReviewActionDialog } from '@/features/review/components/review-action-dialog'
+import { ReviewItemLabel } from '@/features/review/components/review-item-label'
 import { MyEntriesTab } from '@/features/review/components/MyEntriesTab'
 import { PayoutsTab } from '@/features/review/components/PayoutsTab'
 import { QuestionViewContent } from '@/features/tests/components/QuestionViewContent'
@@ -189,16 +190,9 @@ export default function ReviewQueuePage() {
 
   const renderItemTitle = (item) =>
     PREVIEWABLE.has(item.entityType) ? (
-      <button
-        type="button"
-        onClick={() => setViewItem(item)}
-        className="line-clamp-2 text-left font-medium text-primary underline-offset-2 hover:underline"
-        title="View item"
-      >
-        {item.title || item.uuid}
-      </button>
+      <ReviewItemLabel item={item} asButton onClick={() => setViewItem(item)} />
     ) : (
-      <span className="line-clamp-2">{item.title || item.uuid}</span>
+      <ReviewItemLabel item={item} />
     )
 
   if (!hasHydrated || isBootstrapping) {

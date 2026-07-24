@@ -330,14 +330,25 @@ export default function TestsQuestionsPage() {
     enabled: Boolean(dialog && form.subjectUuid),
   })
 
-  const lessonsForFormParams = form.subjectUuid
-    ? { subjectUuid: form.subjectUuid }
-    : {}
+  const lessonsForFormParams = useMemo(() => {
+    if (!form.subjectUuid) return null
+    const params = { subjectUuid: form.subjectUuid }
+    if (form.bookUuids.length > 0) {
+      params.bookUuids = form.bookUuids.join(',')
+    }
+    return params
+  }, [form.subjectUuid, form.bookUuids])
+
   const { data: lessonsForForm = [] } = useQuery({
     queryKey: [...qkLessons, 'form', lessonsForFormParams],
     queryFn: () => fetchTestLessons(lessonsForFormParams),
-    enabled: Boolean(dialog && form.subjectUuid),
+    enabled: Boolean(dialog && form.subjectUuid && form.bookUuids.length > 0),
   })
+
+  const visibleLessonOptions = useMemo(
+    () => lessonsForForm.map((l) => ({ uuid: l.uuid, label: l.name })),
+    [lessonsForForm],
+  )
 
   const { data: boardsForForm = [] } = useQuery({
     queryKey: [...qkBoards, 'form'],
@@ -702,14 +713,31 @@ export default function TestsQuestionsPage() {
                     options={booksForForm.map((b) => ({ uuid: b.uuid, label: b.title }))}
                     selected={form.bookUuids}
                     disabled={createMu.isPending || updateMu.isPending || !form.subjectUuid}
-                    onChange={(bookUuids) => setForm((s) => ({ ...s, bookUuids }))}
+                    onChange={(bookUuids) =>
+                      setForm((s) => ({
+                        ...s,
+                        bookUuids,
+                        lessonUuids: [],
+                      }))
+                    }
                   />
                   <QuestionLinkMultiSelect
                     label="Lessons (optional)"
-                    emptyLabel="No lessons for this subject"
-                    options={lessonsForForm.map((l) => ({ uuid: l.uuid, label: l.name }))}
+                    emptyLabel={
+                      !form.subjectUuid
+                        ? 'Select subject first'
+                        : form.bookUuids.length === 0
+                          ? 'Select a book first'
+                          : 'No lessons for selected book(s)'
+                    }
+                    options={visibleLessonOptions}
                     selected={form.lessonUuids}
-                    disabled={createMu.isPending || updateMu.isPending || !form.subjectUuid}
+                    disabled={
+                      createMu.isPending ||
+                      updateMu.isPending ||
+                      !form.subjectUuid ||
+                      form.bookUuids.length === 0
+                    }
                     onChange={(lessonUuids) => setForm((s) => ({ ...s, lessonUuids }))}
                   />
                   <QuestionLinkMultiSelect

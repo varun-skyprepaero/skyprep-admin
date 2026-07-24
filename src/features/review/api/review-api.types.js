@@ -9,6 +9,7 @@
  *   entityLabel?: string
  *   uuid: string
  *   title?: string
+ *   contextLabel?: string | null
  *   reviewStatus: 'OK' | 'FLAGGED' | 'RESUBMITTED' | 'RESOLVED'
  *   reviewNote?: string | null
  *   reviewedAt?: string | null

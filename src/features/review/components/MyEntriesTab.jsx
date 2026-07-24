@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/data-table'
 import { fetchMyEntries } from '@/features/review/api/review-api'
 import { ReviewStatusBadge } from '@/features/review/components/review-status-badge'
+import { ReviewItemLabel } from '@/features/review/components/review-item-label'
 import { PaymentStatusBadge } from '@/features/review/components/payment-status-badge'
 import {
   REVIEW_ENTITY_LABELS,
@@ -221,7 +222,7 @@ export function MyEntriesTab() {
                           >
                             <td className="px-4 py-3 text-xs">{entityLabel(item)}</td>
                             <td className="max-w-sm px-4 py-3">
-                              <span className="line-clamp-2">{item.title || item.uuid}</span>
+                              <ReviewItemLabel item={item} />
                             </td>
                             <td className="px-4 py-3">
                               <ReviewStatusBadge status={item.reviewStatus} />

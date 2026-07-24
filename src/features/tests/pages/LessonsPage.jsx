@@ -26,6 +26,7 @@ import { Label } from '@/components/ui/label'
 import {
   createTestLesson,
   deleteTestLesson,
+  fetchTestBooks,
   fetchTestLessons,
   fetchTestSubjects,
   updateTestLesson,
@@ -35,17 +36,20 @@ import { notifyError, notifySuccess } from '@/lib/notifications'
 
 const qkLessons = ['tests', 'lessons']
 const qkSubjects = ['tests', 'subjects']
+const qkBooks = ['tests', 'books']
 
 export default function TestsLessonsPage() {
   const queryClient = useQueryClient()
   const [search, setSearch] = useState('')
   const [subjectFilter, setSubjectFilter] = useState('')
+  const [bookFilter, setBookFilter] = useState('')
   const [dialog, setDialog] = useState(null)
   const [deleteTarget, setDeleteTarget] = useState(/** @type {{ uuid: string, label: string } | null} */ (null))
   const [form, setForm] = useState({
     name: '',
     description: '',
     subjectUuid: '',
+    bookUuid: '',
   })
 
   const { data: subjects = [] } = useQuery({
@@ -54,11 +58,31 @@ export default function TestsLessonsPage() {
     enabled: true,
   })
 
-  const lessonsParams = subjectFilter ? { subjectUuid: subjectFilter } : {}
+  const booksFilterParams = subjectFilter ? { subjectUuid: subjectFilter } : {}
+  const { data: booksForFilter = [] } = useQuery({
+    queryKey: [...qkBooks, 'filter', booksFilterParams],
+    queryFn: () => fetchTestBooks(booksFilterParams),
+    enabled: Boolean(subjectFilter),
+  })
+
+  const lessonsParams = useMemo(() => {
+    const params = {}
+    if (subjectFilter) params.subjectUuid = subjectFilter
+    if (bookFilter) params.bookUuid = bookFilter
+    return params
+  }, [subjectFilter, bookFilter])
+
   const { data = [], isLoading, isError, error } = useQuery({
     queryKey: [...qkLessons, lessonsParams],
     queryFn: () => fetchTestLessons(lessonsParams),
     enabled: true,
+  })
+
+  const booksForFormParams = form.subjectUuid ? { subjectUuid: form.subjectUuid } : {}
+  const { data: booksForForm = [] } = useQuery({
+    queryKey: [...qkBooks, 'form', booksForFormParams],
+    queryFn: () => fetchTestBooks(booksForFormParams),
+    enabled: Boolean(dialog && form.subjectUuid),
   })
 
   const filteredRows = useMemo(() => {
@@ -68,7 +92,8 @@ export default function TestsLessonsPage() {
       (row) =>
         row.name.toLowerCase().includes(q) ||
         (row.description ?? '').toLowerCase().includes(q) ||
-        (row.subject?.name ?? '').toLowerCase().includes(q),
+        (row.subject?.name ?? '').toLowerCase().includes(q) ||
+        (row.book?.title ?? '').toLowerCase().includes(q),
     )
   }, [data, search])
 
@@ -78,6 +103,7 @@ export default function TestsLessonsPage() {
     mutationFn: () =>
       createTestLesson({
         subjectUuid: form.subjectUuid.trim(),
+        bookUuid: form.bookUuid.trim(),
         name: form.name.trim(),
         description: form.description.trim() || null,
       }),
@@ -97,6 +123,7 @@ export default function TestsLessonsPage() {
     mutationFn: () =>
       updateTestLesson(dialog.uuid, {
         subjectUuid: form.subjectUuid.trim(),
+        bookUuid: form.bookUuid.trim(),
         name: form.name.trim(),
         description: form.description.trim() || null,
       }),
@@ -131,6 +158,7 @@ export default function TestsLessonsPage() {
       name: '',
       description: '',
       subjectUuid: subjectFilter || '',
+      bookUuid: bookFilter || '',
     })
     setDialog({ mode: 'create' })
   }
@@ -140,6 +168,7 @@ export default function TestsLessonsPage() {
       name: row.name,
       description: row.description ?? '',
       subjectUuid: row.subject?.uuid ?? '',
+      bookUuid: row.book?.uuid ?? '',
     })
     setDialog({ mode: 'edit', uuid: row.uuid })
   }
@@ -152,6 +181,10 @@ export default function TestsLessonsPage() {
       notifyError('Subject is required')
       return
     }
+    if (!form.bookUuid.trim()) {
+      notifyError('Book is required')
+      return
+    }
     if (dialog?.mode === 'create') createMu.mutate()
     else if (dialog?.mode === 'edit') updateMu.mutate()
   }
@@ -162,7 +195,8 @@ export default function TestsLessonsPage() {
         <CardHeader className="pb-4">
           <CardTitle>Lessons</CardTitle>
           <CardDescription>
-            Lessons belong to a subject only. Questions can be tagged with one or more lessons.
+            Chapters belong to a book within a subject. Questions can be tagged with lessons from
+            the selected book.
           </CardDescription>
         </CardHeader>
         <DataTable>
@@ -179,6 +213,7 @@ export default function TestsLessonsPage() {
               value={subjectFilter}
               onChange={(e) => {
                 setSubjectFilter(e.target.value)
+                setBookFilter('')
                 resetPage()
               }}
             >
@@ -186,6 +221,25 @@ export default function TestsLessonsPage() {
               {subjects.map((s) => (
                 <option key={s.uuid} value={s.uuid}>
                   {s.name}
+                </option>
+              ))}
+            </select>
+            <select
+              className={dataTableSelectClass}
+              aria-label="Filter by book"
+              value={bookFilter}
+              disabled={!subjectFilter}
+              onChange={(e) => {
+                setBookFilter(e.target.value)
+                resetPage()
+              }}
+            >
+              <option value="">
+                {subjectFilter ? 'All books' : 'Select subject first'}
+              </option>
+              {booksForFilter.map((book) => (
+                <option key={book.uuid} value={book.uuid}>
+                  {book.title}
                 </option>
               ))}
             </select>
@@ -203,10 +257,11 @@ export default function TestsLessonsPage() {
               <p className="p-6 text-sm text-destructive">{error?.message ?? 'Unable to load'}</p>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[720px] text-left text-sm">
+                <table className="w-full min-w-[840px] text-left text-sm">
                   <thead className="border-b bg-muted/40 text-xs uppercase text-muted-foreground">
                     <tr>
                       <th className="px-4 py-3 font-medium">Name</th>
+                      <th className="px-4 py-3 font-medium">Book</th>
                       <th className="px-4 py-3 font-medium">Subject</th>
                       <th className="px-4 py-3 font-medium">Questions</th>
                       <DataTableActionsHeader />
@@ -215,7 +270,7 @@ export default function TestsLessonsPage() {
                   <tbody>
                     {filteredRows.length === 0 ? (
                       <tr>
-                        <td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">
+                        <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">
                           {data.length === 0 ? 'No lessons yet.' : 'No results match your search.'}
                         </td>
                       </tr>
@@ -223,6 +278,7 @@ export default function TestsLessonsPage() {
                       paginatedRows.map((row) => (
                         <tr key={row.uuid} className="border-b border-border/60 last:border-0">
                           <td className="px-4 py-3">{row.name}</td>
+                          <td className="px-4 py-3">{row.book?.title ?? '—'}</td>
                           <td className="px-4 py-3">{row.subject?.name ?? '—'}</td>
                           <td className="px-4 py-3">{row.questionCount ?? '—'}</td>
                           <DataTableRowActions
@@ -271,7 +327,13 @@ export default function TestsLessonsPage() {
                   id="lesson-subject"
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm"
                   value={form.subjectUuid}
-                  onChange={(e) => setForm((s) => ({ ...s, subjectUuid: e.target.value }))}
+                  onChange={(e) =>
+                    setForm((s) => ({
+                      ...s,
+                      subjectUuid: e.target.value,
+                      bookUuid: '',
+                    }))
+                  }
                   disabled={createMu.isPending || updateMu.isPending}
                   required
                 >
@@ -279,6 +341,26 @@ export default function TestsLessonsPage() {
                   {subjects.map((s) => (
                     <option key={s.uuid} value={s.uuid}>
                       {s.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="lesson-book">Book</Label>
+                <select
+                  id="lesson-book"
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm"
+                  value={form.bookUuid}
+                  onChange={(e) => setForm((s) => ({ ...s, bookUuid: e.target.value }))}
+                  disabled={createMu.isPending || updateMu.isPending || !form.subjectUuid}
+                  required
+                >
+                  <option value="">
+                    {form.subjectUuid ? 'Select…' : 'Select subject first'}
+                  </option>
+                  {booksForForm.map((book) => (
+                    <option key={book.uuid} value={book.uuid}>
+                      {book.title}
                     </option>
                   ))}
                 </select>
