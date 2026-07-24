@@ -13,6 +13,7 @@ import {
   markEntriesPaid,
 } from '@/features/review/api/review-api'
 import { REVIEW_ENTITY_LABELS } from '@/features/review/constants'
+import { ReviewItemLabel } from '@/features/review/components/review-item-label'
 import { handleApiError } from '@/lib/http/api-error'
 import { notifyError, notifySuccess } from '@/lib/notifications'
 
@@ -167,7 +168,7 @@ function PayoutDialog({ author, onClose, onPaid }) {
                       </td>
                       <td className="px-3 py-2 text-xs">{entityLabel(item)}</td>
                       <td className="max-w-sm px-3 py-2">
-                        <span className="line-clamp-2">{item.title || item.uuid}</span>
+                        <ReviewItemLabel item={item} />
                       </td>
                     </tr>
                   )
