@@ -44,6 +44,13 @@ export const REVIEW_STATUS_FILTER_OPTIONS = [
   { value: 'OK', label: 'OK' },
 ]
 
+/** Content-type filter for the reviewer queue. */
+export const REVIEW_QUEUE_TYPE_FILTER_OPTIONS = [
+  { value: '', label: 'All types' },
+  { value: 'question', label: 'Questions' },
+  { value: 'lesson', label: 'Lessons' },
+]
+
 /** Payout state shared with the backend PaymentStatus enum. */
 export const PAYMENT_STATUS = {
   UNPAID: 'UNPAID',

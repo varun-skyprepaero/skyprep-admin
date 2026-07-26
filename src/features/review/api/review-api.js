@@ -8,13 +8,16 @@ function toCsv(value) {
 }
 
 /**
- * @param {{ reviewStatus?: string | string[] }} [params]
+ * @param {{ reviewStatus?: string | string[], entityTypes?: string | string[] }} [params]
  * @returns {Promise<Array<import('./review-api.types').ReviewItem>>}
  */
 export async function fetchReviewQueue(params = {}) {
   try {
     const { data } = await apiClient.get(REVIEW_ENDPOINTS.queue, {
-      params: { reviewStatus: toCsv(params.reviewStatus) },
+      params: {
+        reviewStatus: toCsv(params.reviewStatus),
+        entityTypes: toCsv(params.entityTypes),
+      },
     })
     return Array.isArray(data?.data?.items) ? data.data.items : []
   } catch (error) {

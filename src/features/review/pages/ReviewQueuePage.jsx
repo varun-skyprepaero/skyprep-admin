@@ -27,6 +27,7 @@ import { QuestionViewContent } from '@/features/tests/components/QuestionViewCon
 import {
   OPEN_REVIEW_STATUSES,
   REVIEW_ENTITY_LABELS,
+  REVIEW_QUEUE_TYPE_FILTER_OPTIONS,
   REVIEW_STATUS_FILTER_OPTIONS,
   REVIEW_STATUS_META,
 } from '@/features/review/constants'
@@ -74,6 +75,7 @@ export default function ReviewQueuePage() {
 
   const [tab, setTab] = useState(canReview ? 'queue' : 'myentries')
   const [statusFilter, setStatusFilter] = useState('')
+  const [typeFilter, setTypeFilter] = useState('')
   const [authorFilter, setAuthorFilter] = useState('')
   const [action, setAction] = useState(
     /** @type {null | { mode: 'flag' | 'resolve', item: import('@/features/review/api/review-api.types').ReviewItem }} */ (
@@ -92,8 +94,12 @@ export default function ReviewQueuePage() {
         : [statusFilter]
 
   const queueQuery = useQuery({
-    queryKey: [...queueKey, statusFilter],
-    queryFn: () => fetchReviewQueue({ reviewStatus: queueStatuses }),
+    queryKey: [...queueKey, statusFilter, typeFilter],
+    queryFn: () =>
+      fetchReviewQueue({
+        reviewStatus: queueStatuses,
+        entityTypes: typeFilter ? [typeFilter] : undefined,
+      }),
     enabled: canReview && tab === 'queue',
   })
 
@@ -124,7 +130,7 @@ export default function ReviewQueuePage() {
         status,
         note,
       }),
-    onSuccess: (_data, variables) => {
+    onSuccess: (data, variables) => {
       const messages = {
         FLAGGED: 'Marked for review',
         ACCEPTED: 'Item accepted',
@@ -132,6 +138,36 @@ export default function ReviewQueuePage() {
       }
       notifySuccess(messages[variables.status] ?? 'Review updated')
       setAction(null)
+      setViewItem((prev) => {
+        if (
+          !prev ||
+          prev.uuid !== variables.item.uuid ||
+          prev.entityType !== variables.item.entityType
+        ) {
+          return prev
+        }
+        return {
+          ...prev,
+          ...(data && typeof data === 'object' ? data : {}),
+          reviewStatus: variables.status,
+        }
+      })
+      if (variables.item.entityType === 'question') {
+        queryClient.setQueryData(['review', 'question-detail', variables.item.uuid], (old) =>
+          old
+            ? {
+                ...old,
+                reviewStatus: variables.status,
+                reviewNote:
+                  variables.status === 'FLAGGED'
+                    ? (data?.reviewNote ?? old.reviewNote)
+                    : variables.status === 'ACCEPTED' || variables.status === 'RESOLVED'
+                      ? null
+                      : old.reviewNote,
+              }
+            : old,
+        )
+      }
       void queryClient.invalidateQueries({ queryKey: queueKey })
       void queryClient.invalidateQueries({ queryKey: mineKey })
       void queryClient.invalidateQueries({ queryKey: ['review', 'stats'] })
@@ -260,6 +296,19 @@ export default function ReviewQueuePage() {
                 {REVIEW_STATUS_FILTER_OPTIONS.filter((o) => o.value).map((o) => (
                   <option key={o.value} value={o.value}>
                     {o.label}
+                  </option>
+                ))}
+              </select>
+              <span className="ml-2 text-sm text-muted-foreground">Type</span>
+              <select
+                className={dataTableSelectClass}
+                aria-label="Filter by content type"
+                value={typeFilter}
+                onChange={(e) => setTypeFilter(e.target.value)}
+              >
+                {REVIEW_QUEUE_TYPE_FILTER_OPTIONS.map((option) => (
+                  <option key={option.value || 'all'} value={option.value}>
+                    {option.label}
                   </option>
                 ))}
               </select>
@@ -595,7 +644,17 @@ export default function ReviewQueuePage() {
               {viewQuery.error?.message ?? 'Unable to load this item.'}
             </p>
           ) : viewItem ? (
-            <QuestionViewContent question={viewQuery.data} />
+            <QuestionViewContent
+              question={
+                viewQuery.data
+                  ? {
+                      ...viewQuery.data,
+                      reviewStatus: viewItem.reviewStatus,
+                      reviewNote: viewItem.reviewNote,
+                    }
+                  : viewQuery.data
+              }
+            />
           ) : null}
         </ModalBody>
         {viewItem && !viewQuery.isLoading && !viewQuery.isError ? (
@@ -619,10 +678,7 @@ export default function ReviewQueuePage() {
                       type="button"
                       disabled={reviewMutation.isPending}
                       onClick={() =>
-                        reviewMutation.mutate(
-                          { item: viewItem, status: 'ACCEPTED' },
-                          { onSuccess: () => setViewItem(nextItem) },
-                        )
+                        reviewMutation.mutate({ item: viewItem, status: 'ACCEPTED' })
                       }
                     >
                       {reviewMutation.isPending ? (
