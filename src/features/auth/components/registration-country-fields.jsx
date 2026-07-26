@@ -1,10 +1,16 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
   countrySelectionFromIso,
   detectUserCountrySelection,
 } from '@/lib/phone/country-selection'
+import {
+  fetchCityOptions,
+  fetchStateOptions,
+  resolveDetectedLocation,
+} from '@/lib/location/location-data'
 import { COUNTRY_CALLING_CODES } from '@/lib/phone/country-calling-codes'
 import { cn } from '@/lib/utils'
 import { ChevronDown, Loader2, LocateFixed } from 'lucide-react'
@@ -22,13 +28,114 @@ const phoneCodeSelectClass = cn(
 
 /**
  * @param {{
+ *   id: string,
+ *   label: string,
+ *   value: string,
+ *   options: import('@/lib/location/location-data').LocationOption[],
+ *   placeholder: string,
+ *   disabled?: boolean,
+ *   invalid?: boolean,
+ *   error?: string,
+ *   hint?: string,
+ *   loading?: boolean,
+ *   preferSelect?: boolean,
+ *   onChange: (value: string) => void,
+ *   manualPlaceholder?: string,
+ * }} props
+ */
+function LocationPickerField({
+  id,
+  label,
+  value,
+  options,
+  placeholder,
+  disabled = false,
+  invalid = false,
+  error,
+  hint,
+  loading = false,
+  preferSelect = false,
+  onChange,
+  manualPlaceholder,
+}) {
+  const useDropdown = preferSelect || options.length > 0 || loading
+  const fieldDisabled = disabled || loading
+  const displayOptions =
+    value && !options.some((option) => option.value === value)
+      ? [{ value, label: value }, ...options]
+      : options
+
+  return (
+    <div className="min-w-0 space-y-2">
+      <Label htmlFor={id}>{label}</Label>
+      {useDropdown ? (
+        <div className="relative min-w-0 overflow-hidden">
+          <select
+            id={id}
+            className={cn(selectClass, 'min-w-0 truncate', invalid && 'border-destructive/60')}
+            value={value}
+            disabled={fieldDisabled}
+            aria-invalid={invalid}
+            aria-required
+            title={value || placeholder}
+            onChange={(e) => onChange(e.target.value)}
+          >
+            <option value="">{loading ? 'Loading…' : placeholder}</option>
+            {displayOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+          <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
+            {loading ? (
+              <Loader2 className="size-4 animate-spin text-muted-foreground" aria-hidden />
+            ) : (
+              <ChevronDown className="size-4 text-muted-foreground" aria-hidden />
+            )}
+          </span>
+        </div>
+      ) : (
+        <Input
+          id={id}
+          value={value}
+          disabled={fieldDisabled}
+          aria-invalid={invalid}
+          aria-required
+          placeholder={loading ? 'Loading…' : manualPlaceholder ?? placeholder}
+          onChange={(e) => onChange(e.target.value)}
+          className={cn(selectClass, 'shadow-sm')}
+        />
+      )}
+      {error ? (
+        <p className="text-sm text-destructive">{error}</p>
+      ) : hint ? (
+        <p className="text-xs text-muted-foreground">{hint}</p>
+      ) : null}
+    </div>
+  )
+}
+
+/**
+ * @param {{
  *   countryIso: string,
  *   phoneCountryIso: string,
  *   phoneNumber: string,
+ *   city: string,
+ *   state: string,
  *   onCountryIsoChange: (iso2: string, selection: ReturnType<typeof countrySelectionFromIso>) => void,
  *   onPhoneCountryIsoChange: (iso2: string, selection: ReturnType<typeof countrySelectionFromIso>) => void,
  *   onPhoneNumberChange: (value: string) => void,
- *   errors?: { country?: string, phoneCountryCode?: string, phoneNumber?: string },
+ *   onCityChange: (value: string) => void,
+ *   onStateChange: (value: string) => void,
+ *   onLocationDetected?: (detected: { city?: string, state?: string }) => void,
+ *   errors?: {
+ *     country?: string,
+ *     phoneCountryCode?: string,
+ *     phoneNumber?: string,
+ *     city?: string,
+ *     state?: string,
+ *   },
  *   disabled?: boolean,
  * }} props
  */
@@ -36,25 +143,119 @@ export function RegistrationCountryFields({
   countryIso,
   phoneCountryIso,
   phoneNumber,
+  city,
+  state,
   onCountryIsoChange,
   onPhoneCountryIsoChange,
   onPhoneNumberChange,
+  onCityChange,
+  onStateChange,
+  onLocationDetected,
   errors = {},
   disabled = false,
 }) {
   const [locationError, setLocationError] = useState('')
   const [detecting, setDetecting] = useState(false)
+  const [stateOptions, setStateOptions] = useState(/** @type {import('@/lib/location/location-data').LocationOption[]} */ ([]))
+  const [cityOptions, setCityOptions] = useState(/** @type {import('@/lib/location/location-data').LocationOption[]} */ ([]))
+  const [statesLoading, setStatesLoading] = useState(false)
+  const [citiesLoading, setCitiesLoading] = useState(false)
 
-  const selectedCountry = countrySelectionFromIso(countryIso)
   const selectedPhoneCountry = countrySelectionFromIso(phoneCountryIso)
+  const hasStateDropdown = stateOptions.length > 0
+  const hasCityDropdown = cityOptions.length > 0
+  const stateUsesSelect = Boolean(countryIso) && (statesLoading || hasStateDropdown)
+  const cityUsesSelect =
+    citiesLoading || hasCityDropdown || (hasStateDropdown && !state.trim())
+
+  useEffect(() => {
+    if (!countryIso) {
+      setStateOptions([])
+      return
+    }
+
+    let cancelled = false
+    setStatesLoading(true)
+    void fetchStateOptions(countryIso)
+      .then((options) => {
+        if (!cancelled) setStateOptions(options)
+      })
+      .catch(() => {
+        if (!cancelled) setStateOptions([])
+      })
+      .finally(() => {
+        if (!cancelled) setStatesLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [countryIso])
+
+  useEffect(() => {
+    if (!countryIso || !state.trim()) {
+      setCityOptions([])
+      return
+    }
+
+    let cancelled = false
+    setCitiesLoading(true)
+    void fetchCityOptions(countryIso, state)
+      .then((options) => {
+        if (!cancelled) setCityOptions(options)
+      })
+      .catch(() => {
+        if (!cancelled) setCityOptions([])
+      })
+      .finally(() => {
+        if (!cancelled) setCitiesLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [countryIso, state])
+
+  const stateHint = useMemo(() => {
+    if (!countryIso) return 'Select a country first'
+    if (statesLoading) return 'Loading states…'
+    if (hasStateDropdown) return 'Choose your state or province'
+    return 'Enter your state or region'
+  }, [countryIso, statesLoading, hasStateDropdown])
+
+  const cityHint = useMemo(() => {
+    if (!countryIso) return 'Select a country first'
+    if (hasStateDropdown && !state) return 'Select a state first'
+    if (citiesLoading) return 'Loading cities…'
+    if (hasCityDropdown) return 'Choose your city'
+    return 'Enter your city'
+  }, [countryIso, state, citiesLoading, hasCityDropdown, hasStateDropdown])
+
+  function handleCountryChange(iso, selection) {
+    onCountryIsoChange(iso, selection)
+    onStateChange('')
+    onCityChange('')
+    setLocationError('')
+  }
+
+  function handleStateChange(nextState) {
+    onStateChange(nextState)
+    onCityChange('')
+  }
 
   async function useMyLocation() {
     setLocationError('')
     setDetecting(true)
     try {
       const sel = await detectUserCountrySelection()
-      onCountryIsoChange(sel.countryIso, sel)
+      handleCountryChange(sel.countryIso, sel)
       onPhoneCountryIsoChange(sel.countryIso, sel)
+
+      const resolved = await resolveDetectedLocation(sel.countryIso, sel.state, sel.city)
+      if (resolved.state) onStateChange(resolved.state)
+      if (resolved.city) onCityChange(resolved.city)
+
+      onLocationDetected?.({ city: resolved.city || sel.city, state: resolved.state || sel.state })
     } catch (err) {
       setLocationError(err instanceof Error ? err.message : 'Could not detect location')
     } finally {
@@ -93,8 +294,7 @@ export function RegistrationCountryFields({
             value={countryIso}
             onChange={(e) => {
               const iso = e.target.value
-              onCountryIsoChange(iso, countrySelectionFromIso(iso))
-              setLocationError('')
+              handleCountryChange(iso, countrySelectionFromIso(iso))
             }}
             disabled={disabled || detecting}
             aria-invalid={Boolean(errors.country)}
@@ -124,6 +324,45 @@ export function RegistrationCountryFields({
             {locationError}
           </p>
         ) : null}
+      </div>
+
+      <div className="grid min-w-0 gap-4 sm:grid-cols-2">
+        <LocationPickerField
+          id="state"
+          label="State"
+          value={state}
+          options={stateOptions}
+          loading={statesLoading}
+          preferSelect={stateUsesSelect}
+          placeholder={countryIso ? 'Select state' : 'Select country first'}
+          manualPlaceholder="State / province"
+          disabled={disabled || detecting || !countryIso}
+          invalid={Boolean(errors.state)}
+          error={errors.state}
+          hint={stateHint}
+          onChange={handleStateChange}
+        />
+        <LocationPickerField
+          id="city"
+          label="City"
+          value={city}
+          options={cityOptions}
+          loading={citiesLoading}
+          preferSelect={cityUsesSelect}
+          placeholder={
+            !countryIso
+              ? 'Select country first'
+              : hasStateDropdown && !state
+                ? 'Select state first'
+                : 'Select city'
+          }
+          manualPlaceholder="City"
+          disabled={disabled || detecting || !countryIso || (hasStateDropdown && !state)}
+          invalid={Boolean(errors.city)}
+          error={errors.city}
+          hint={cityHint}
+          onChange={onCityChange}
+        />
       </div>
 
       <div className="space-y-2">

@@ -1,7 +1,7 @@
 import { COUNTRY_CALLING_CODES } from '@/lib/phone/country-calling-codes'
 import { getBrowserTimezone } from '@/lib/datetime/timezone-utils'
 
-/** @typedef {{ countryIso: string, country: string, countryCode: string }} CountrySelection */
+/** @typedef {{ countryIso: string, country: string, countryCode: string, city?: string, state?: string }} CountrySelection */
 
 /** @type {Record<string, string>} */
 const TIMEZONE_TO_ISO = {
@@ -37,7 +37,71 @@ export function countrySelectionFromIso(iso2) {
 }
 
 /**
- * @param {{ countryIso?: string, phoneCountryIso?: string, country?: string, countryCode?: string, phoneNumber?: string }} form
+ * @param {Record<string, string | undefined> | null | undefined} address
+ */
+function parseCityFromAddress(address) {
+  return (
+    address?.city ||
+    address?.town ||
+    address?.village ||
+    address?.municipality ||
+    address?.county ||
+    ''
+  ).trim()
+}
+
+/**
+ * @param {Record<string, string | undefined> | null | undefined} address
+ */
+function parseStateFromAddress(address) {
+  return (address?.state || address?.state_district || address?.region || '').trim()
+}
+
+/**
+ * @param {string | null | undefined} value
+ */
+export function normalizeLocationPart(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+}
+
+/**
+ * @param {string | null | undefined} left
+ * @param {string | null | undefined} right
+ */
+export function locationsMatch(left, right) {
+  return normalizeLocationPart(left) === normalizeLocationPart(right)
+}
+
+/**
+ * @param {{
+ *   city?: string,
+ *   state?: string,
+ *   detectedCity?: string,
+ *   detectedState?: string,
+ * }} form
+ */
+export function hasDetectedLocationMismatch(form) {
+  const cityMismatch =
+    Boolean(form.detectedCity?.trim()) &&
+    !locationsMatch(form.city, form.detectedCity)
+  const stateMismatch =
+    Boolean(form.detectedState?.trim()) &&
+    !locationsMatch(form.state, form.detectedState)
+  return cityMismatch || stateMismatch
+}
+
+/**
+ * @param {{
+ *   countryIso?: string,
+ *   phoneCountryIso?: string,
+ *   country?: string,
+ *   countryCode?: string,
+ *   phoneNumber?: string,
+ *   city?: string,
+ *   state?: string,
+ * }} form
  */
 export function resolveRegistrationContact(form) {
   const countryMatch = countrySelectionFromIso(form.countryIso)
@@ -46,6 +110,8 @@ export function resolveRegistrationContact(form) {
     country: countryMatch?.country ?? form.country?.trim() ?? '',
     countryCode: phoneMatch?.countryCode ?? form.countryCode?.trim() ?? '',
     phoneNumber: form.phoneNumber?.trim() ?? '',
+    city: form.city?.trim() ?? '',
+    state: form.state?.trim() ?? '',
   }
 }
 
@@ -105,7 +171,13 @@ function detectCountryFromGeolocation() {
           if (!sel) {
             throw new Error('Country could not be determined')
           }
-          resolve(sel)
+          const city = parseCityFromAddress(data?.address)
+          const state = parseStateFromAddress(data?.address)
+          resolve({
+            ...sel,
+            ...(city ? { city } : {}),
+            ...(state ? { state } : {}),
+          })
         } catch (err) {
           reject(err instanceof Error ? err : new Error('Could not look up your location'))
         }

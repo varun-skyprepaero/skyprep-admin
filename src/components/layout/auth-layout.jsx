@@ -1,5 +1,6 @@
 import { Outlet } from 'react-router-dom'
 import { Shield } from 'lucide-react'
+import { ThemeToggle } from '@/components/ui/theme-toggle'
 import { env } from '@/config/env'
 import { cn } from '@/lib/utils'
 
@@ -41,7 +42,10 @@ export function AuthLayout() {
         </p>
       </div>
 
-      <div className="flex flex-1 items-center justify-center px-6 py-10 lg:px-12">
+      <div className="flex flex-1 flex-col items-center justify-center px-6 py-10 lg:px-12">
+        <div className="mb-4 flex w-full max-w-md justify-end">
+          <ThemeToggle />
+        </div>
         <div className="w-full max-w-md">
           <Outlet />
         </div>

@@ -18,6 +18,7 @@ import {
 import { toAuthSession } from '@/features/auth/lib/to-auth-session'
 import { ClassroomSignupRedirect } from '@/features/auth/components/classroom-signup-redirect'
 import { RegistrationCountryFields } from '@/features/auth/components/registration-country-fields'
+import { RegistrationPolicyConsent } from '@/features/auth/components/registration-policy-consent'
 import { isClassroomSignupInvite } from '@/features/auth/lib/is-classroom-signup-invite'
 import { SUPER_ADMIN_ROLE_NAME } from '@/features/invitations/constants'
 import { TimezoneField } from '@/features/auth/components/timezone-field'
@@ -25,7 +26,7 @@ import { getPasswordValidationError } from '@/features/auth/lib/password-policy'
 import { GENDER_OPTIONS, normalizeGenderValue } from '@/features/auth/constants/gender'
 import { env } from '@/config/env'
 import { getBrowserTimezone, isValidIANATimezone, normalizeTimezone } from '@/lib/datetime/timezone-utils'
-import { resolveRegistrationContact, countrySelectionFromIso } from '@/lib/phone/country-selection'
+import { resolveRegistrationContact, countrySelectionFromIso, hasDetectedLocationMismatch } from '@/lib/phone/country-selection'
 import { handleApiError } from '@/lib/http/api-error'
 import { notifySuccess } from '@/lib/notifications'
 import { useAuthStore } from '@/stores/auth-store'
@@ -60,6 +61,12 @@ function validateInviteForm(form) {
       errors.phoneNumber = 'Enter a valid phone number (6–15 digits)'
     }
   }
+  if (!contact.city) errors.city = 'City is required'
+  if (!contact.state) errors.state = 'State is required'
+  if (!form.acceptedPolicies) {
+    errors.acceptedPolicies =
+      'You must accept the Terms & Conditions and Privacy Policy to create an account'
+  }
 
   return errors
 }
@@ -79,9 +86,16 @@ export default function RegisterPage() {
     country: '',
     phoneCountryIso: '',
     phoneNumber: '',
+    city: '',
+    state: '',
+    detectedCity: '',
+    detectedState: '',
+    acceptedPolicies: false,
   }))
   const [errors, setErrors] = useState({})
   const [showPassword, setShowPassword] = useState(false)
+  const [pendingLocationConfirm, setPendingLocationConfirm] = useState(false)
+  const [locationConfirmed, setLocationConfirmed] = useState(false)
   const navigate = useNavigate()
   const setSession = useAuthStore((s) => s.setSession)
 
@@ -148,6 +162,56 @@ export default function RegisterPage() {
     })
   }
 
+  function applyDetectedLocation(detected) {
+    setForm((prev) => ({
+      ...prev,
+      detectedCity: detected.city?.trim() ?? '',
+      detectedState: detected.state?.trim() ?? '',
+    }))
+    setLocationConfirmed(false)
+    setPendingLocationConfirm(false)
+  }
+
+  function applyCityChange(city) {
+    setForm((prev) => ({ ...prev, city }))
+    setErrors((prev) => {
+      const next = { ...prev }
+      delete next.city
+      return next
+    })
+    setLocationConfirmed(false)
+    setPendingLocationConfirm(false)
+  }
+
+  function applyStateChange(state) {
+    setForm((prev) => ({ ...prev, state }))
+    setErrors((prev) => {
+      const next = { ...prev }
+      delete next.state
+      return next
+    })
+    setLocationConfirmed(false)
+    setPendingLocationConfirm(false)
+  }
+
+  function submitRegistration(overrides = {}) {
+    const contact = resolveRegistrationContact({ ...form, ...overrides })
+    mutation.mutate({
+      inviteToken,
+      firstName: form.firstName.trim(),
+      lastName: form.lastName.trim() || undefined,
+      gender: form.gender,
+      password: form.password,
+      timezone: normalizeTimezone(form.timezone) ?? '',
+      countryCode: contact.countryCode,
+      phoneNumber: contact.phoneNumber,
+      country: contact.country,
+      city: contact.city,
+      state: contact.state,
+      acceptedPolicies: form.acceptedPolicies,
+    })
+  }
+
   function handleSubmit(event) {
     event.preventDefault()
     if (isClassroomSignupInvite(inviteMeta)) {
@@ -159,22 +223,40 @@ export default function RegisterPage() {
       timezone: form.timezone,
     })
     if (Object.keys(validation).length > 0) {
+      setPendingLocationConfirm(false)
       setErrors(validation)
       return
     }
+
+    if (hasDetectedLocationMismatch(form) && !locationConfirmed) {
+      setPendingLocationConfirm(true)
+      return
+    }
+
+    setPendingLocationConfirm(false)
     setErrors({})
-    const contact = resolveRegistrationContact(form)
-    mutation.mutate({
-      inviteToken,
-      firstName: form.firstName.trim(),
-      lastName: form.lastName.trim() || undefined,
-      gender: form.gender,
-      password: form.password,
-      timezone: normalizeTimezone(form.timezone) ?? '',
-      countryCode: contact.countryCode,
-      phoneNumber: contact.phoneNumber,
-      country: contact.country,
-    })
+    submitRegistration()
+  }
+
+  function useDetectedLocation() {
+    const nextCity = form.detectedCity || form.city
+    const nextState = form.detectedState || form.state
+    setForm((prev) => ({
+      ...prev,
+      city: nextCity,
+      state: nextState,
+    }))
+    setLocationConfirmed(true)
+    setPendingLocationConfirm(false)
+    setErrors({})
+    submitRegistration({ city: nextCity, state: nextState })
+  }
+
+  function confirmManualLocation() {
+    setLocationConfirmed(true)
+    setPendingLocationConfirm(false)
+    setErrors({})
+    submitRegistration()
   }
 
   if (!inviteToken) {
@@ -329,18 +411,48 @@ export default function RegisterPage() {
             countryIso={form.countryIso}
             phoneCountryIso={form.phoneCountryIso}
             phoneNumber={form.phoneNumber}
+            city={form.city}
+            state={form.state}
             onCountryIsoChange={applyCountrySelection}
             onPhoneCountryIsoChange={applyPhoneCountrySelection}
             onPhoneNumberChange={(phoneNumber) =>
               setForm((prev) => ({ ...prev, phoneNumber }))
             }
+            onCityChange={applyCityChange}
+            onStateChange={applyStateChange}
+            onLocationDetected={applyDetectedLocation}
             errors={{
               country: errors.country,
               phoneCountryCode: errors.phoneCountryCode || errors.countryCode,
               phoneNumber: errors.phoneNumber,
+              city: errors.city,
+              state: errors.state,
             }}
             disabled={mutation.isPending}
           />
+
+          {pendingLocationConfirm ? (
+            <div
+              className="space-y-3 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-3 text-sm"
+              role="alert"
+            >
+              <p>
+                Your entered location ({form.city}, {form.state}) differs from detected location
+                {form.detectedCity || form.detectedState
+                  ? ` (${form.detectedCity || '—'}, ${form.detectedState || '—'})`
+                  : ''}
+                . Please confirm or update your entry.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" size="sm" variant="outline" onClick={useDetectedLocation}>
+                  Use detected location
+                </Button>
+                <Button type="button" size="sm" onClick={confirmManualLocation}>
+                  Keep my entry
+                </Button>
+              </div>
+            </div>
+          ) : null}
 
           <TimezoneField
             value={form.timezone}
@@ -384,7 +496,25 @@ export default function RegisterPage() {
             ) : null}
           </div>
 
-          <Button type="submit" className="w-full" disabled={mutation.isPending}>
+          <RegistrationPolicyConsent
+            checked={form.acceptedPolicies}
+            onChange={(acceptedPolicies) => {
+              setForm((prev) => ({ ...prev, acceptedPolicies }))
+              setErrors((prev) => {
+                const next = { ...prev }
+                delete next.acceptedPolicies
+                return next
+              })
+            }}
+            error={errors.acceptedPolicies}
+            disabled={mutation.isPending}
+          />
+
+          <Button
+            type="submit"
+            className="w-full"
+            disabled={mutation.isPending || !form.acceptedPolicies}
+          >
             {mutation.isPending ? (
               <Loader2 className="size-4 animate-spin" aria-hidden />
             ) : null}
