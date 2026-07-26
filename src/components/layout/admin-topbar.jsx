@@ -3,6 +3,7 @@ import { LogOut, Menu, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import { getAdminNavTitle } from '@/config/admin-nav'
 import { logoutSession } from '@/features/auth/api/auth-api'
 import { Button } from '@/components/ui/button'
+import { ThemeToggle } from '@/components/ui/theme-toggle'
 import { useAuthStore } from '@/stores/auth-store'
 import { notifySuccess } from '@/lib/notifications'
 import { cn } from '@/lib/utils'
@@ -59,6 +60,8 @@ export function AdminTopbar({ onMenuClick, onToggleCollapse, sidebarCollapsed = 
           {user.email}
         </p>
       ) : null}
+
+      <ThemeToggle />
 
       <Button type="button" variant="outline" size="sm" onClick={handleLogout}>
         <LogOut className="size-4" aria-hidden />

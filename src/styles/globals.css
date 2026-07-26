@@ -38,6 +38,37 @@
       sans-serif;
   }
 
+  .dark {
+    --background: 222 35% 8%;
+    --foreground: 210 22% 96%;
+
+    --muted: 223 26% 14%;
+    --muted-foreground: 215 14% 58%;
+
+    --popover: 224 30% 11%;
+    --popover-foreground: 210 22% 96%;
+
+    --card: 224 30% 11%;
+    --card-foreground: 210 22% 96%;
+
+    --border: 223 18% 20%;
+    --input: 223 22% 16%;
+
+    --primary: 213 45% 62%;
+    --primary-foreground: 222 47% 8%;
+
+    --secondary: 223 24% 16%;
+    --secondary-foreground: 210 20% 92%;
+
+    --accent: 223 24% 18%;
+    --accent-foreground: 210 22% 96%;
+
+    --destructive: 0 72% 58%;
+    --destructive-foreground: 0 0% 100%;
+
+    --ring: 213 45% 62%;
+  }
+
   * {
     @apply border-border;
   }
@@ -47,5 +78,57 @@
     font-feature-settings:
       'rlig' 1,
       'calt' 1;
+    background-image: radial-gradient(
+      ellipse 80% 55% at 50% -15%,
+      hsl(222 35% 92% / 0.45),
+      transparent
+    );
+  }
+
+  .dark body {
+    background-image: radial-gradient(
+      ellipse 80% 50% at 50% -20%,
+      hsl(213 30% 18% / 0.35),
+      transparent
+    );
+  }
+
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation-duration: 0.65s;
+    animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  ::view-transition-old(root) {
+    animation-name: theme-fade-out;
+  }
+
+  ::view-transition-new(root) {
+    animation-name: theme-fade-in;
+  }
+
+  @keyframes theme-fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes theme-fade-out {
+    from {
+      opacity: 1;
+    }
+    to {
+      opacity: 0;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    ::view-transition-old(root),
+    ::view-transition-new(root) {
+      animation: none !important;
+    }
   }
 }
