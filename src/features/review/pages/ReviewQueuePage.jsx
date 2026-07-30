@@ -138,20 +138,24 @@ export default function ReviewQueuePage() {
       }
       notifySuccess(messages[variables.status] ?? 'Review updated')
       setAction(null)
-      setViewItem((prev) => {
-        if (
-          !prev ||
-          prev.uuid !== variables.item.uuid ||
-          prev.entityType !== variables.item.entityType
-        ) {
-          return prev
-        }
-        return {
-          ...prev,
-          ...(data && typeof data === 'object' ? data : {}),
-          reviewStatus: variables.status,
-        }
-      })
+      if (variables.status === 'ACCEPTED') {
+        // Preview advance is handled by the Approve button callback.
+      } else {
+        setViewItem((prev) => {
+          if (
+            !prev ||
+            prev.uuid !== variables.item.uuid ||
+            prev.entityType !== variables.item.entityType
+          ) {
+            return prev
+          }
+          return {
+            ...prev,
+            ...(data && typeof data === 'object' ? data : {}),
+            reviewStatus: variables.status,
+          }
+        })
+      }
       if (variables.item.entityType === 'question') {
         queryClient.setQueryData(['review', 'question-detail', variables.item.uuid], (old) =>
           old
@@ -677,9 +681,16 @@ export default function ReviewQueuePage() {
                     <Button
                       type="button"
                       disabled={reviewMutation.isPending}
-                      onClick={() =>
-                        reviewMutation.mutate({ item: viewItem, status: 'ACCEPTED' })
-                      }
+                      onClick={() => {
+                        const next =
+                          viewIndex >= 0 && viewIndex < viewList.length - 1
+                            ? viewList[viewIndex + 1]
+                            : null
+                        reviewMutation.mutate(
+                          { item: viewItem, status: 'ACCEPTED' },
+                          { onSuccess: () => setViewItem(next) },
+                        )
+                      }}
                     >
                       {reviewMutation.isPending ? (
                         <Loader2 className="size-4 animate-spin" aria-hidden />
