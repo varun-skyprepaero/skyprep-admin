@@ -24,6 +24,7 @@ export const USER_ENDPOINTS = {
   auditors: '/users/auditors',
   profile: (uuid) => `/users/${uuid}`,
   adminUpdate: (uuid) => `/users/${uuid}/admin`,
+  adminInsights: (uuid) => `/users/${uuid}/admin/insights`,
   adminDelete: (uuid) => `/users/${uuid}/admin`,
   permanentDelete: (uuid) => `/users/${uuid}/permanent`,
   setAuditor: (uuid) => `/users/${uuid}/auditor`,

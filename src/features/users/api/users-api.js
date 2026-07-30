@@ -29,7 +29,7 @@ export async function fetchDeletedUsers() {
 
 /**
  * @param {string} userUuid
- * @param {{ firstName?: string, lastName?: string | null, isActive?: boolean }} payload
+ * @param {{ firstName?: string, lastName?: string | null, isActive?: boolean, storageQuotaBytes?: number }} payload
  */
 export async function adminUpdateUser(userUuid, payload) {
   try {
@@ -90,6 +90,25 @@ export async function setUserAuditor(userUuid, auditorUuid) {
       auditorUuid: auditorUuid || null,
     })
     return data
+  } catch (error) {
+    throw toApiClientError(error)
+  }
+}
+
+/**
+ * @param {string} userUuid
+ * @returns {Promise<import('./users-api.types').AdminUserInsights>}
+ */
+export async function fetchAdminUserInsights(userUuid) {
+  try {
+    const { data } = await apiClient.get(USER_ENDPOINTS.adminInsights(userUuid))
+    return data?.data ?? {
+      storage: { usedBytes: 0, quotaBytes: 0, remainingBytes: 0, percentUsed: 0 },
+      counts: {
+        trainingEnrollments: { total: 0 },
+        purchaseOrders: { total: 0 },
+      },
+    }
   } catch (error) {
     throw toApiClientError(error)
   }

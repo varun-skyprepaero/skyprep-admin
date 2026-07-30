@@ -12,6 +12,8 @@ const LoginPage = lazyWithRetry(() => import('@/features/auth/pages/LoginPage'))
 const ForgotPasswordPage = lazyWithRetry(() => import('@/features/auth/pages/ForgotPasswordPage'))
 const RegisterPage = lazyWithRetry(() => import('@/features/auth/pages/RegisterPage'))
 const UsersPage = lazyWithRetry(() => import('@/features/users/pages/UsersPage'))
+const UserDetailRoute = lazyWithRetry(() => import('@/features/users/pages/UserDetailRoute'))
+const UserInviteDetailRoute = lazyWithRetry(() => import('@/features/users/pages/UserInviteDetailRoute'))
 const TestsLayout = lazyWithRetry(() => import('@/features/tests/TestsLayout'))
 const ExamsLayout = lazyWithRetry(() => import('@/features/tests/ExamsLayout'))
 const TestsBoardsPage = lazyWithRetry(() => import('@/features/tests/pages/BoardsPage'))
@@ -120,6 +122,22 @@ export const router = createBrowserRouter([
             element: (
               <SuspensePage>
                 <UsersPage />
+              </SuspensePage>
+            ),
+          },
+          {
+            path: '/users/invites/:inviteUuid',
+            element: (
+              <SuspensePage>
+                <UserInviteDetailRoute />
+              </SuspensePage>
+            ),
+          },
+          {
+            path: '/users/:uuid',
+            element: (
+              <SuspensePage>
+                <UserDetailRoute />
               </SuspensePage>
             ),
           },

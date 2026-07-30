@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Navigate } from 'react-router-dom'
+import { Navigate, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Modal, ModalBody, ModalFooter, ModalHeader } from '@/components/ui/modal'
 import {
@@ -14,7 +14,6 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { DeleteConfirmDialog } from '@/components/ui/delete-confirm-dialog'
-import { USER_ENDPOINTS } from '@/features/auth/constants'
 import {
   cancelInvitation,
   createInvitation,
@@ -38,19 +37,21 @@ import { CLASSROOM_APP_ROLE_NAMES } from '@/features/invitations/constants'
 import { GrantAccessDialog } from '@/features/subscription/components/GrantAccessDialog'
 import { fetchInvitableRoles } from '@/features/roles-permissions/api/permissions-api'
 import { ClassroomImpersonateDialog } from '@/features/users/components/ClassroomImpersonateDialog'
-import { adminDeleteUser, adminUpdateUser, fetchAuditors, fetchDeletedUsers, fetchUsers, permanentlyDeleteUser, setUserAuditor } from '@/features/users/api/users-api'
+import { SignupSourceBadge } from '@/features/users/components/SignupSourceBadge'
+import { adminDeleteUser, fetchAuditors, fetchDeletedUsers, fetchUsers, permanentlyDeleteUser, setUserAuditor } from '@/features/users/api/users-api'
+import {
+  auditorsQueryKey,
+  deletedUsersQueryKey,
+  invitationsQueryKey,
+  invitableRolesQueryKey,
+  usersQueryKey,
+} from '@/features/users/constants/query-keys'
 import { handleApiError } from '@/lib/http/api-error'
 import { notifyError, notifySuccess } from '@/lib/notifications'
 import { useAuthStore } from '@/stores/auth-store'
 import { usePermissionsStore } from '@/stores/permissions-store'
 import { cn } from '@/lib/utils'
 import { Loader2, LogIn, UserPlus } from 'lucide-react'
-
-const usersQueryKey = ['admin', 'users', USER_ENDPOINTS.list]
-const deletedUsersQueryKey = ['admin', 'users', USER_ENDPOINTS.deleted]
-const invitationsQueryKey = ['admin', 'invitations', 'pending']
-const invitableRolesQueryKey = ['admin', 'invitable-roles']
-const auditorsQueryKey = ['admin', 'auditors']
 
 function formatShortDate(value) {
   if (!value) return '—'
@@ -96,6 +97,7 @@ function buildTableRows(users, invitations) {
     roleName: u.role?.name ?? null,
     registrationSource: u.registrationSource ?? null,
     isActive: u.isActive,
+    storageQuotaBytes: u.storageQuotaBytes ?? null,
     createdAt: u.createdAt,
     auditor: u.auditor ?? null,
     auditorUuid: u.auditor?.uuid ?? null,
@@ -229,37 +231,8 @@ const SIGNUP_SOURCE_FILTER_OPTIONS = [
   { value: 'unknown', label: 'Unknown / legacy' },
 ]
 
-function SignupSourceCell({ row }) {
-  if (row.kind === 'invite') {
-    return (
-      <span className="text-xs text-muted-foreground">Pending invite</span>
-    )
-  }
-  switch (row.registrationSource) {
-    case 'INVITED':
-      return (
-        <span className="inline-flex rounded-full bg-violet-500/15 px-2 py-0.5 text-xs font-medium text-violet-800 dark:text-violet-300">
-          Admin invite
-        </span>
-      )
-    case 'SELF_REGISTERED':
-      return (
-        <span className="inline-flex rounded-full bg-teal-500/15 px-2 py-0.5 text-xs font-medium text-teal-800 dark:text-teal-300">
-          Classroom (web)
-        </span>
-      )
-    case 'ADMIN_CREATED':
-      return (
-        <span className="inline-flex rounded-full bg-slate-500/15 px-2 py-0.5 text-xs font-medium text-slate-800 dark:text-slate-300">
-          Admin created
-        </span>
-      )
-    default:
-      return <span className="text-xs text-muted-foreground">Unknown</span>
-  }
-}
-
 export default function UsersPage() {
+  const navigate = useNavigate()
   const queryClient = useQueryClient()
   const user = useAuthStore((s) => s.user)
   const matrix = usePermissionsStore((s) => s.matrix)
@@ -271,12 +244,6 @@ export default function UsersPage() {
   const [roleName, setRoleName] = useState(INVITABLE_ROLE_OPTIONS[0].value)
   const [inviteErrors, setInviteErrors] = useState({})
 
-  const [editUser, setEditUser] = useState(
-    /** @type {null | { uuid: string, firstName: string, lastName: string, isActive: boolean, roleName: string | null }} */ (
-      null
-    ),
-  )
-  const [editErrors, setEditErrors] = useState({})
   const [cancelInviteTarget, setCancelInviteTarget] = useState(
     /** @type {null | { uuid: string, email: string }} */ (null),
   )
@@ -505,21 +472,13 @@ export default function UsersPage() {
     })
   }
 
-  const adminUpdateMutation = useMutation({
-    mutationFn: (/** @type {{ uuid: string, payload: { firstName?: string, lastName?: string | null, isActive?: boolean } }} */ vars) =>
-      adminUpdateUser(vars.uuid, vars.payload),
-    onSuccess: (response) => {
-      notifySuccess(response?.message ?? 'User updated')
-      setEditUser(null)
-      setEditErrors({})
-      invalidatePeople()
-    },
-    onError: (error) => {
-      const { message, fieldErrors } = handleApiError(error, 'Unable to update user')
-      setEditErrors({ ...fieldErrors, ...(message ? { root: message } : {}) })
-      notifyError(message || 'Unable to update user')
-    },
-  })
+  function openPeopleDetail(row) {
+    if (row.kind === 'user') {
+      navigate(`/users/${row.uuid}`)
+      return
+    }
+    navigate(`/users/invites/${row.uuid}`)
+  }
 
   const deleteUserMutation = useMutation({
     mutationFn: (/** @type {string} */ userUuid) => adminDeleteUser(userUuid),
@@ -619,36 +578,6 @@ export default function UsersPage() {
     setPeopleList(next)
     setPage(1)
     setTableSearch('')
-  }
-
-  function openEditForUser(row) {
-    if (row.kind !== 'user') return
-    setEditErrors({})
-    setEditUser({
-      uuid: row.uuid,
-      firstName: row.firstName ?? '',
-      lastName: row.lastName ?? '',
-      isActive: Boolean(row.isActive),
-      roleName: row.roleName,
-    })
-  }
-
-  function submitEdit(e) {
-    e.preventDefault()
-    if (!editUser) return
-    setEditErrors({})
-    const payload = {
-      firstName: editUser.firstName.trim(),
-      lastName: editUser.lastName.trim() || null,
-    }
-    if (!payload.firstName) {
-      setEditErrors({ firstName: 'First name is required' })
-      return
-    }
-    if (editUser.roleName !== SUPER_ADMIN_ROLE_NAME) {
-      payload.isActive = editUser.isActive
-    }
-    adminUpdateMutation.mutate({ uuid: editUser.uuid, payload })
   }
 
   const loadingPeople =
@@ -975,7 +904,11 @@ export default function UsersPage() {
                       const resending =
                         resendMutation.isPending && resendMutation.variables === row.uuid
                       return (
-                        <tr key={row.key} className="bg-background transition-colors hover:bg-muted/30">
+                        <tr
+                          key={row.key}
+                          className="cursor-pointer bg-background transition-colors hover:bg-muted/30"
+                          onClick={() => openPeopleDetail(row)}
+                        >
                           <td className="px-4 py-3 align-middle font-medium text-foreground lg:px-6">
                             <div className="flex flex-col gap-0.5">
                               <span>{displayName || '—'}</span>
@@ -1002,7 +935,10 @@ export default function UsersPage() {
                             )}
                           </td>
                           <td className="px-4 py-3 align-middle lg:px-6">
-                            <SignupSourceCell row={row} />
+                            <SignupSourceBadge
+                              registrationSource={row.kind === 'user' ? row.registrationSource : null}
+                              pendingInvite={row.kind === 'invite'}
+                            />
                           </td>
                           <td className="px-4 py-3 align-middle lg:px-6">
                             {row.kind === 'user' ? (
@@ -1051,7 +987,6 @@ export default function UsersPage() {
                             disabled={
                               resending ||
                               cancelInviteMutation.isPending ||
-                              adminUpdateMutation.isPending ||
                               deleteUserMutation.isPending
                             }
                             leading={
@@ -1067,7 +1002,10 @@ export default function UsersPage() {
                                   className="size-8 shrink-0"
                                   title="Open as this user"
                                   aria-label={`Open as ${displayName || row.email}`}
-                                  onClick={() => openImpersonateUser(row)}
+                                  onClick={(event) => {
+                                    event.stopPropagation()
+                                    openImpersonateUser(row)
+                                  }}
                                 >
                                   <LogIn className="size-4" aria-hidden />
                                 </Button>
@@ -1108,8 +1046,8 @@ export default function UsersPage() {
                                         ]
                                       : []),
                                     {
-                                      label: 'Edit user',
-                                      onClick: () => openEditForUser(row),
+                                      label: 'View details',
+                                      onClick: () => openPeopleDetail(row),
                                     },
                                     ...(canDeleteUserRow(row)
                                       ? [
@@ -1232,90 +1170,6 @@ export default function UsersPage() {
                 <Loader2 className="size-4 animate-spin" aria-hidden />
               ) : null}
               Send invitation
-            </Button>
-          </ModalFooter>
-        </form>
-      </Modal>
-
-      <Modal
-        open={Boolean(editUser)}
-        onClose={() => setEditUser(null)}
-        size="md"
-        closeDisabled={adminUpdateMutation.isPending}
-        aria-labelledby="edit-user-title"
-      >
-        <ModalHeader
-          title="Edit user"
-          description="Update name and account status for this member."
-          titleId="edit-user-title"
-          onClose={() => setEditUser(null)}
-          closeDisabled={adminUpdateMutation.isPending}
-        />
-        <form onSubmit={submitEdit} className="flex min-h-0 flex-1 flex-col" noValidate>
-          <ModalBody className="space-y-4">
-            {editErrors.root ? (
-              <p
-                className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
-                role="alert"
-              >
-                {editErrors.root}
-              </p>
-            ) : null}
-            <div className="space-y-2">
-              <Label htmlFor="edit-first">First name</Label>
-              <Input
-                id="edit-first"
-                value={editUser?.firstName ?? ''}
-                onChange={(e) => setEditUser((s) => (s ? { ...s, firstName: e.target.value } : s))}
-                aria-invalid={Boolean(editErrors.firstName)}
-                disabled={adminUpdateMutation.isPending}
-              />
-              {editErrors.firstName ? (
-                <p className="text-sm text-destructive">{editErrors.firstName}</p>
-              ) : null}
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-last">Last name</Label>
-              <Input
-                id="edit-last"
-                value={editUser?.lastName ?? ''}
-                onChange={(e) => setEditUser((s) => (s ? { ...s, lastName: e.target.value } : s))}
-                disabled={adminUpdateMutation.isPending}
-              />
-            </div>
-            {editUser?.roleName === SUPER_ADMIN_ROLE_NAME ? (
-              <p className="text-xs text-muted-foreground">
-                Super Admin accounts cannot be deactivated from this screen.
-              </p>
-            ) : (
-              <label className="flex cursor-pointer items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  className="size-4 rounded border-input"
-                  checked={editUser?.isActive ?? false}
-                  onChange={(e) =>
-                    setEditUser((s) => (s ? { ...s, isActive: e.target.checked } : s))
-                  }
-                  disabled={adminUpdateMutation.isPending}
-                />
-                Account active
-              </label>
-            )}
-          </ModalBody>
-          <ModalFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setEditUser(null)}
-              disabled={adminUpdateMutation.isPending}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" disabled={adminUpdateMutation.isPending}>
-              {adminUpdateMutation.isPending ? (
-                <Loader2 className="size-4 animate-spin" aria-hidden />
-              ) : null}
-              Save
             </Button>
           </ModalFooter>
         </form>

@@ -280,7 +280,7 @@ export function DataTableRowActions({
       : null
 
   return (
-    <td className={cn('px-2 py-3 align-middle lg:px-3', className)}>
+    <td className={cn('px-2 py-3 align-middle lg:px-3', className)} onClick={(event) => event.stopPropagation()}>
       <div className="flex items-center justify-end gap-1">
         {leading}
         <Button
