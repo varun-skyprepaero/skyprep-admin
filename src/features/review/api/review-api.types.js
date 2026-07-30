@@ -54,6 +54,8 @@
  *   author: ReviewParty
  *   createdBy: ReviewParty
  *   itemCount: number
+ *   ratePerItem?: string | null
+ *   totalAmount?: string | null
  *   note?: string | null
  *   createdAt?: string | null
  * }} PayoutBatch

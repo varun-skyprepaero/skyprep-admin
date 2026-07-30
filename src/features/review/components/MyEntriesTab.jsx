@@ -57,6 +57,13 @@ function formatDate(value) {
   }
 }
 
+function formatMoney(value) {
+  if (value == null || value === '') return null
+  const n = Number(value)
+  if (!Number.isFinite(n)) return null
+  return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
 function entityLabel(item) {
   return item.entityLabel ?? REVIEW_ENTITY_LABELS[item.entityType] ?? item.entityType
 }
@@ -327,6 +334,12 @@ export function MyEntriesTab() {
                   <div>
                     <div className="font-medium">
                       {b.itemCount} item{b.itemCount === 1 ? '' : 's'} paid
+                      {b.totalAmount != null ? (
+                        <span className="ml-2 text-muted-foreground">
+                          · {formatMoney(b.totalAmount)}
+                          {b.ratePerItem != null ? ` (${formatMoney(b.ratePerItem)} each)` : ''}
+                        </span>
+                      ) : null}
                     </div>
                     {b.note ? (
                       <div className="text-xs text-muted-foreground">{b.note}</div>

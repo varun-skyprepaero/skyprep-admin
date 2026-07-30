@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Loader2 } from 'lucide-react'
 import { ActionConfirmDialog } from '@/components/ui/action-confirm-dialog'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Modal, ModalBody, ModalFooter, ModalHeader } from '@/components/ui/modal'
 import { DataTable, DataTableContent } from '@/components/ui/data-table'
@@ -45,9 +46,35 @@ function itemKey(item) {
   return `${item.entityType}:${item.uuid}`
 }
 
+function parseRate(value) {
+  const trimmed = String(value ?? '').trim()
+  if (!trimmed) return null
+  const n = Number.parseFloat(trimmed)
+  return Number.isFinite(n) && n >= 0 ? n : null
+}
+
+function formatMoney(value) {
+  if (value == null || value === '') return '—'
+  const n = Number(value)
+  if (!Number.isFinite(n)) return '—'
+  return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+function selectFirstItems(items, count) {
+  const n = Math.max(0, Math.min(items.length, Math.floor(Number(count) || 0)))
+  const next = {}
+  for (let i = 0; i < n; i += 1) {
+    const it = items[i]
+    next[itemKey(it)] = it
+  }
+  return next
+}
+
 /** Drill-in modal: an author's payable (accepted + unpaid) entries with bulk pay. */
 function PayoutDialog({ author, onClose, onPaid }) {
   const [selected, setSelected] = useState(/** @type {Record<string, any>} */ ({}))
+  const [selectCount, setSelectCount] = useState('')
+  const [rate, setRate] = useState('')
   const [note, setNote] = useState('')
 
   const entriesQuery = useQuery({
@@ -63,20 +90,21 @@ function PayoutDialog({ author, onClose, onPaid }) {
   const items = entriesQuery.data?.items ?? []
   const selectedKeys = Object.keys(selected)
   const allSelected = items.length > 0 && selectedKeys.length === items.length
+  const parsedRate = parseRate(rate)
+  const payoutCount = selectedKeys.length
+  const finalAmount = parsedRate != null && payoutCount > 0 ? parsedRate * payoutCount : null
 
   const mutation = useMutation({
-    mutationFn: ({ all }) =>
+    mutationFn: () =>
       markEntriesPaid({
         authorUuid: author.authorUuid,
-        all,
-        items: all
-          ? undefined
-          : Object.values(selected).map((it) => ({
-              domain: it.domain,
-              entityType: it.entityType,
-              uuid: it.uuid,
-            })),
+        items: Object.values(selected).map((it) => ({
+          domain: it.domain,
+          entityType: it.entityType,
+          uuid: it.uuid,
+        })),
         note: note.trim() || undefined,
+        ratePerItem: parsedRate,
       }),
     onSuccess: (data) => {
       notifySuccess(
@@ -96,6 +124,7 @@ function PayoutDialog({ author, onClose, onPaid }) {
       const key = itemKey(item)
       if (next[key]) delete next[key]
       else next[key] = item
+      setSelectCount(String(Object.keys(next).length))
       return next
     })
   }
@@ -103,11 +132,26 @@ function PayoutDialog({ author, onClose, onPaid }) {
   const toggleAll = () => {
     if (allSelected) {
       setSelected({})
+      setSelectCount('0')
     } else {
       const next = {}
       for (const it of items) next[itemKey(it)] = it
       setSelected(next)
+      setSelectCount(String(items.length))
     }
+  }
+
+  const onSelectCountChange = (value) => {
+    if (value.trim() === '') {
+      setSelectCount('')
+      setSelected({})
+      return
+    }
+    const n = Number.parseInt(value, 10)
+    if (!Number.isFinite(n)) return
+    const clamped = Math.max(0, Math.min(items.length, n))
+    setSelectCount(String(clamped))
+    setSelected(selectFirstItems(items, clamped))
   }
 
   return (
@@ -139,7 +183,55 @@ function PayoutDialog({ author, onClose, onPaid }) {
             No accepted, unpaid entries for this person.
           </p>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-3">
+              <div>
+                <Label htmlFor="payout-select-count">
+                  Questions to pay <span className="text-muted-foreground">(max {items.length})</span>
+                </Label>
+                <Input
+                  id="payout-select-count"
+                  type="number"
+                  min={0}
+                  max={items.length}
+                  step={1}
+                  value={selectCount}
+                  onChange={(e) => onSelectCountChange(e.target.value)}
+                  placeholder={String(items.length)}
+                  className="mt-1"
+                />
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Selects the first N payable items (up to {items.length}).
+                </p>
+              </div>
+              <div>
+                <Label htmlFor="payout-rate">Rate per question</Label>
+                <Input
+                  id="payout-rate"
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={rate}
+                  onChange={(e) => setRate(e.target.value)}
+                  placeholder="e.g. 50"
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <Label>Final amount</Label>
+                <div className="mt-1 flex h-10 items-center rounded-md border border-input bg-muted/30 px-3 text-sm font-medium">
+                  {finalAmount != null ? (
+                    <>
+                      {formatMoney(parsedRate)} × {payoutCount} = {formatMoney(finalAmount)}
+                    </>
+                  ) : (
+                    <span className="text-muted-foreground">Enter rate and select items</span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead className="border-b bg-muted/40 text-xs uppercase text-muted-foreground">
                 <tr>
@@ -153,17 +245,20 @@ function PayoutDialog({ author, onClose, onPaid }) {
                   </th>
                   <th className="px-3 py-2 font-medium">Type</th>
                   <th className="px-3 py-2 font-medium">Item</th>
+                  <th className="px-3 py-2 text-right font-medium">Rate</th>
+                  <th className="px-3 py-2 text-right font-medium">Amount</th>
                 </tr>
               </thead>
               <tbody>
                 {items.map((item) => {
                   const key = itemKey(item)
+                  const isSelected = Boolean(selected[key])
                   return (
                     <tr key={key} className="border-b border-border/60 last:border-0">
                       <td className="px-3 py-2">
                         <input
                           type="checkbox"
-                          checked={Boolean(selected[key])}
+                          checked={isSelected}
                           onChange={() => toggle(item)}
                           aria-label={`Select ${item.title || item.uuid}`}
                         />
@@ -172,11 +267,18 @@ function PayoutDialog({ author, onClose, onPaid }) {
                       <td className="max-w-sm px-3 py-2">
                         <ReviewItemLabel item={item} />
                       </td>
+                      <td className="px-3 py-2 text-right text-xs tabular-nums">
+                        {isSelected && parsedRate != null ? formatMoney(parsedRate) : '—'}
+                      </td>
+                      <td className="px-3 py-2 text-right text-xs tabular-nums">
+                        {isSelected && parsedRate != null ? formatMoney(parsedRate) : '—'}
+                      </td>
                     </tr>
                   )
                 })}
               </tbody>
             </table>
+            </div>
           </div>
         )}
       </ModalBody>
@@ -196,24 +298,13 @@ function PayoutDialog({ author, onClose, onPaid }) {
           <div className="flex flex-wrap justify-end gap-2">
             <Button
               type="button"
-              variant="outline"
               disabled={mutation.isPending || selectedKeys.length === 0}
-              onClick={() => mutation.mutate({ all: false })}
+              onClick={() => mutation.mutate()}
             >
               {mutation.isPending ? (
                 <Loader2 className="mr-2 size-4 animate-spin" aria-hidden />
               ) : null}
               Mark selected paid ({selectedKeys.length})
-            </Button>
-            <Button
-              type="button"
-              disabled={mutation.isPending}
-              onClick={() => mutation.mutate({ all: true })}
-            >
-              {mutation.isPending ? (
-                <Loader2 className="mr-2 size-4 animate-spin" aria-hidden />
-              ) : null}
-              Mark all payable paid ({items.length})
             </Button>
           </div>
         </ModalFooter>
@@ -387,6 +478,8 @@ export function PayoutsTab() {
                       <th className="px-4 py-3 font-medium">Date</th>
                       <th className="px-4 py-3 font-medium">Person</th>
                       <th className="px-4 py-3 text-right font-medium">Items paid</th>
+                      <th className="px-4 py-3 text-right font-medium">Rate</th>
+                      <th className="px-4 py-3 text-right font-medium">Total</th>
                       <th className="px-4 py-3 font-medium">Paid by</th>
                       <th className="px-4 py-3 font-medium">Note</th>
                       <th className="w-28 px-4 py-3" />
@@ -395,7 +488,7 @@ export function PayoutsTab() {
                   <tbody>
                     {batches.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">
+                        <td colSpan={8} className="px-4 py-10 text-center text-muted-foreground">
                           No payouts recorded yet.
                         </td>
                       </tr>
@@ -415,6 +508,12 @@ export function PayoutsTab() {
                             ) : null}
                           </td>
                           <td className="px-4 py-3 text-right font-medium">{b.itemCount}</td>
+                          <td className="px-4 py-3 text-right text-xs tabular-nums">
+                            {formatMoney(b.ratePerItem)}
+                          </td>
+                          <td className="px-4 py-3 text-right text-xs font-medium tabular-nums">
+                            {formatMoney(b.totalAmount)}
+                          </td>
                           <td className="px-4 py-3 text-xs">{b.createdBy?.name ?? '—'}</td>
                           <td className="max-w-xs px-4 py-3 text-xs text-muted-foreground">
                             <span className="line-clamp-2">{b.note || '—'}</span>

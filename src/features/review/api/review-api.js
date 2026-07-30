@@ -143,16 +143,17 @@ export async function fetchPayoutBatches(params = {}) {
 
 /**
  * Settle an auditee's accepted work into a payout batch.
- * @param {{ authorUuid: string, items?: Array<{ domain?: string, entityType: string, uuid: string }>, all?: boolean, note?: string }} input
+ * @param {{ authorUuid: string, items?: Array<{ domain?: string, entityType: string, uuid: string }>, all?: boolean, note?: string, ratePerItem?: number | string | null }} input
  * @returns {Promise<{ count: number, batch: import('./review-api.types').PayoutBatch | null }>}
  */
-export async function markEntriesPaid({ authorUuid, items, all = false, note }) {
+export async function markEntriesPaid({ authorUuid, items, all = false, note, ratePerItem }) {
   try {
     const { data } = await apiClient.post(REVIEW_ENDPOINTS.markPaid, {
       authorUuid,
       items,
       all,
       note: note ?? null,
+      ratePerItem: ratePerItem ?? null,
     })
     return data?.data ?? { count: 0, batch: null }
   } catch (error) {
