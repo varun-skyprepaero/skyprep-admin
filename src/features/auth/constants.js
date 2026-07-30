@@ -40,5 +40,6 @@ export const REVIEW_ENDPOINTS = {
   paymentStats: '/review/payments/stats',
   payoutBatches: '/review/payments/batches',
   markPaid: '/review/payments/mark-paid',
+  revertPayout: '/review/payments/revert',
   apply: (domain, entityType, uuid) => `/review/${domain}/${entityType}/${uuid}`,
 }

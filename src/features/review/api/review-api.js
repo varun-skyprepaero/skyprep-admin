@@ -159,3 +159,19 @@ export async function markEntriesPaid({ authorUuid, items, all = false, note }) 
     throw toApiClientError(error)
   }
 }
+
+/**
+ * Undo a payout batch and mark its items unpaid again.
+ * @param {{ batchUuid: string }} input
+ * @returns {Promise<{ count: number }>}
+ */
+export async function revertPayout({ batchUuid }) {
+  try {
+    const { data } = await apiClient.post(REVIEW_ENDPOINTS.revertPayout, {
+      batchUuid,
+    })
+    return data?.data ?? { count: 0 }
+  } catch (error) {
+    throw toApiClientError(error)
+  }
+}

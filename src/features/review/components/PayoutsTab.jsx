@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Loader2 } from 'lucide-react'
+import { ActionConfirmDialog } from '@/components/ui/action-confirm-dialog'
 import { Button } from '@/components/ui/button'
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Modal, ModalBody, ModalFooter, ModalHeader } from '@/components/ui/modal'
@@ -11,6 +12,7 @@ import {
   fetchPaymentStats,
   fetchPayoutBatches,
   markEntriesPaid,
+  revertPayout,
 } from '@/features/review/api/review-api'
 import { REVIEW_ENTITY_LABELS } from '@/features/review/constants'
 import { ReviewItemLabel } from '@/features/review/components/review-item-label'
@@ -223,6 +225,7 @@ function PayoutDialog({ author, onClose, onPaid }) {
 export function PayoutsTab() {
   const queryClient = useQueryClient()
   const [target, setTarget] = useState(/** @type {null | any} */ (null))
+  const [revertTarget, setRevertTarget] = useState(/** @type {null | any} */ (null))
 
   const statsQuery = useQuery({
     queryKey: statsKey,
@@ -242,8 +245,7 @@ export function PayoutsTab() {
     [authors],
   )
 
-  const onPaid = () => {
-    setTarget(null)
+  const invalidatePayoutQueries = () => {
     void queryClient.invalidateQueries({ queryKey: statsKey })
     void queryClient.invalidateQueries({ queryKey: batchesKey })
     void queryClient.invalidateQueries({ queryKey: ['review', 'author-payable'] })
@@ -251,6 +253,28 @@ export function PayoutsTab() {
     void queryClient.invalidateQueries({ queryKey: ['review', 'stats'] })
     void queryClient.invalidateQueries({ queryKey: ['review', 'queue'] })
   }
+
+  const onPaid = () => {
+    setTarget(null)
+    invalidatePayoutQueries()
+  }
+
+  const revertMutation = useMutation({
+    mutationFn: ({ batchUuid }) => revertPayout({ batchUuid }),
+    onSuccess: (data) => {
+      notifySuccess(
+        data?.count
+          ? `Reverted payout (${data.count} item${data.count === 1 ? '' : 's'} marked unpaid)`
+          : 'Payout reverted',
+      )
+      setRevertTarget(null)
+      invalidatePayoutQueries()
+    },
+    onError: (err) => {
+      const { message } = handleApiError(err, 'Unable to revert payout')
+      notifyError(message)
+    },
+  })
 
   return (
     <div className="space-y-6">
@@ -365,12 +389,13 @@ export function PayoutsTab() {
                       <th className="px-4 py-3 text-right font-medium">Items paid</th>
                       <th className="px-4 py-3 font-medium">Paid by</th>
                       <th className="px-4 py-3 font-medium">Note</th>
+                      <th className="w-28 px-4 py-3" />
                     </tr>
                   </thead>
                   <tbody>
                     {batches.length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="px-4 py-10 text-center text-muted-foreground">
+                        <td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">
                           No payouts recorded yet.
                         </td>
                       </tr>
@@ -394,6 +419,17 @@ export function PayoutsTab() {
                           <td className="max-w-xs px-4 py-3 text-xs text-muted-foreground">
                             <span className="line-clamp-2">{b.note || '—'}</span>
                           </td>
+                          <td className="px-4 py-3 text-right">
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              disabled={revertMutation.isPending}
+                              onClick={() => setRevertTarget(b)}
+                            >
+                              Revert
+                            </Button>
+                          </td>
                         </tr>
                       ))
                     )}
@@ -406,6 +442,24 @@ export function PayoutsTab() {
       </Card>
 
       {target ? <PayoutDialog author={target} onClose={() => setTarget(null)} onPaid={onPaid} /> : null}
+
+      <ActionConfirmDialog
+        open={Boolean(revertTarget)}
+        title="Revert payout?"
+        description={
+          revertTarget
+            ? `This will mark ${revertTarget.itemCount} item${revertTarget.itemCount === 1 ? '' : 's'} for ${revertTarget.author?.name ?? 'this person'} as unpaid again and remove the payout from history.`
+            : undefined
+        }
+        confirmLabel="Revert payout"
+        loading={revertMutation.isPending}
+        onClose={() => {
+          if (!revertMutation.isPending) setRevertTarget(null)
+        }}
+        onConfirm={() => {
+          if (revertTarget) revertMutation.mutate({ batchUuid: revertTarget.uuid })
+        }}
+      />
     </div>
   )
 }
