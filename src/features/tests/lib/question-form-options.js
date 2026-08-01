@@ -140,3 +140,33 @@ export function validateQuestionAnswers(type, form) {
 export function usesChoiceOptionsList(type) {
   return type === 'SINGLE_CHOICE' || type === 'MULTIPLE_CHOICE'
 }
+
+/**
+ * Map a question API row into the admin edit form shape.
+ * @param {Record<string, any>} row
+ */
+export function buildQuestionFormFromRow(row) {
+  const type = row.type
+  const mapped =
+    row.options?.length > 0
+      ? row.options.map((o) => ({
+          label: o.label,
+          text: o.text,
+          isCorrect: o.isCorrect,
+        }))
+      : []
+
+  return {
+    subjectUuid: row.subject?.uuid ?? '',
+    bookUuids: (row.books ?? (row.book ? [row.book] : [])).map((b) => b.uuid),
+    lessonUuids: (row.lessons ?? []).map((l) => l.uuid),
+    boardUuids: (row.boards ?? []).map((b) => b.uuid),
+    suiteUuids: (row.suites ?? []).map((s) => s.uuid),
+    type,
+    difficulty: row.difficulty,
+    score: String(row.score ?? '1'),
+    stem: row.stem,
+    explanation: row.explanation ?? '',
+    options: optionsForQuestionType(type, mapped),
+  }
+}

@@ -10,6 +10,7 @@
  *   uuid: string
  *   title?: string
  *   contextLabel?: string | null
+ *   bookTitle?: string | null
  *   reviewStatus: 'OK' | 'FLAGGED' | 'RESUBMITTED' | 'RESOLVED'
  *   reviewNote?: string | null
  *   reviewedAt?: string | null

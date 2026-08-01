@@ -109,3 +109,21 @@ export function reviewEntityEditHref(entityType, uuid) {
 export function isReviewEntryDeleteDisabled(item) {
   return item.reviewStatus === REVIEW_STATUS.ACCEPTED || item.paymentStatus === PAYMENT_STATUS.PAID
 }
+
+/**
+ * Accepted entries are locked; authors edit only while still in review.
+ * @param {{ reviewStatus?: string }} item
+ */
+export function isReviewEntryEditDisabled(item) {
+  return item.reviewStatus === REVIEW_STATUS.ACCEPTED
+}
+
+/** Statuses where clicking the badge should reveal the review note. */
+export const REVIEW_NOTE_STATUSES = ['FLAGGED', 'RESUBMITTED']
+
+/**
+ * @param {{ reviewStatus?: string }} item
+ */
+export function canShowReviewNote(item) {
+  return REVIEW_NOTE_STATUSES.includes(item.reviewStatus ?? '')
+}

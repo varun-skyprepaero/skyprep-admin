@@ -28,6 +28,7 @@ import { QuestionAnswerFields } from '@/features/tests/components/QuestionAnswer
 import { DIFFICULTY_OPTIONS, QUESTION_TYPE_OPTIONS } from '@/features/tests/constants'
 import {
   buildOptionsPayload,
+  buildQuestionFormFromRow,
   optionsForQuestionType,
   validateQuestionAnswers,
 } from '@/features/tests/lib/question-form-options'
@@ -152,6 +153,7 @@ export default function TestsQuestionsPage() {
   const [subjectFilter, setSubjectFilter] = useState('')
   const [lessonFilter, setLessonFilter] = useState('')
   const [difficultyFilter, setDifficultyFilter] = useState('')
+  const [scoreFilter, setScoreFilter] = useState('')
   const [reviewFilter, setReviewFilter] = useState('')
   const [mineOnly, setMineOnly] = useState(false)
   const [reviewAction, setReviewAction] = useState(
@@ -185,6 +187,25 @@ export default function TestsQuestionsPage() {
       params.lessonUuid = lessonFilter
     }
     if (difficultyFilter) params.difficulty = difficultyFilter
+    if (scoreFilter.trim()) params.score = scoreFilter.trim()
+    if (reviewFilter) params.reviewStatus = reviewFilter
+    if (mineOnly && user?.uuid) params.createdByUuid = user.uuid
+    return params
+  }, [subjectFilter, lessonFilter, difficultyFilter, scoreFilter, reviewFilter, mineOnly, user?.uuid])
+
+  const scoreOptionParams = useMemo(() => {
+    const params = {}
+    if (subjectFilter === FILTER_NO_LESSON) {
+      params.noLesson = true
+    } else if (subjectFilter) {
+      params.subjectUuid = subjectFilter
+    }
+    if (lessonFilter === FILTER_NO_LESSON) {
+      params.noLesson = true
+    } else if (lessonFilter) {
+      params.lessonUuid = lessonFilter
+    }
+    if (difficultyFilter) params.difficulty = difficultyFilter
     if (reviewFilter) params.reviewStatus = reviewFilter
     if (mineOnly && user?.uuid) params.createdByUuid = user.uuid
     return params
@@ -205,6 +226,22 @@ export default function TestsQuestionsPage() {
     enabled: true,
   })
 
+  const { data: questionsForScoreOptions = [] } = useQuery({
+    queryKey: [...qkQ, 'score-options', scoreOptionParams],
+    queryFn: () => fetchTestQuestions(scoreOptionParams),
+    enabled: Boolean(scoreFilter),
+  })
+
+  const scoreOptions = useMemo(() => {
+    const source = scoreFilter ? questionsForScoreOptions : data
+    const scores = new Set()
+    for (const row of source) {
+      const value = row.score != null ? String(row.score).trim() : ''
+      if (value) scores.add(value)
+    }
+    return [...scores].sort((a, b) => Number(a) - Number(b))
+  }, [scoreFilter, questionsForScoreOptions, data])
+
   const filteredRows = useMemo(() => {
     const q = search.trim().toLowerCase()
     if (!q) return data
@@ -216,6 +253,13 @@ export default function TestsQuestionsPage() {
   }, [data, search])
 
   const { paginatedRows, paginationProps, resetPage } = usePaginatedRows(filteredRows)
+
+  useEffect(() => {
+    if (scoreFilter && !scoreOptions.includes(scoreFilter)) {
+      setScoreFilter('')
+      resetPage()
+    }
+  }, [scoreFilter, scoreOptions, resetPage])
 
   const viewParam = searchParams.get('view')
   useEffect(() => {
@@ -378,28 +422,7 @@ export default function TestsQuestionsPage() {
   }
 
   function openEdit(row) {
-    const type = row.type
-    const mapped =
-      row.options?.length > 0
-        ? row.options.map((o) => ({
-            label: o.label,
-            text: o.text,
-            isCorrect: o.isCorrect,
-          }))
-        : []
-    setForm({
-      subjectUuid: row.subject?.uuid ?? '',
-      bookUuids: (row.books ?? (row.book ? [row.book] : [])).map((b) => b.uuid),
-      lessonUuids: (row.lessons ?? []).map((l) => l.uuid),
-      boardUuids: (row.boards ?? []).map((b) => b.uuid),
-      suiteUuids: (row.suites ?? []).map((s) => s.uuid),
-      type,
-      difficulty: row.difficulty,
-      score: String(row.score ?? '1'),
-      stem: row.stem,
-      explanation: row.explanation ?? '',
-      options: optionsForQuestionType(type, mapped),
-    })
+    setForm(buildQuestionFormFromRow(row))
     setDialog({ mode: 'edit', uuid: row.uuid })
   }
 
@@ -500,6 +523,22 @@ export default function TestsQuestionsPage() {
               {DIFFICULTY_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
                   {option.label}
+                </option>
+              ))}
+            </select>
+            <select
+              className={dataTableSelectClass}
+              aria-label="Filter by marks"
+              value={scoreFilter}
+              onChange={(e) => {
+                setScoreFilter(e.target.value)
+                resetPage()
+              }}
+            >
+              <option value="">All marks</option>
+              {scoreOptions.map((score) => (
+                <option key={score} value={score}>
+                  {score}
                 </option>
               ))}
             </select>

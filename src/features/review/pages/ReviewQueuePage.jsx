@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
-import { Navigate } from 'react-router-dom'
+import { Link, Navigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Loader2 } from 'lucide-react'
+import { Loader2, Pencil } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Modal, ModalBody, ModalFooter, ModalHeader } from '@/components/ui/modal'
@@ -21,15 +21,19 @@ import { fetchTestQuestion } from '@/features/tests/api/tests-api'
 import { ReviewStatusBadge } from '@/features/review/components/review-status-badge'
 import { ReviewActionDialog } from '@/features/review/components/review-action-dialog'
 import { ReviewItemLabel } from '@/features/review/components/review-item-label'
+import { ReviewNoteDialog } from '@/features/review/components/ReviewNoteDialog'
 import { MyEntriesTab } from '@/features/review/components/MyEntriesTab'
 import { PayoutsTab } from '@/features/review/components/PayoutsTab'
 import { QuestionViewContent } from '@/features/tests/components/QuestionViewContent'
+import { QuestionEditDialog } from '@/features/tests/components/QuestionEditDialog'
 import {
   OPEN_REVIEW_STATUSES,
   REVIEW_ENTITY_LABELS,
   REVIEW_QUEUE_TYPE_FILTER_OPTIONS,
   REVIEW_STATUS_FILTER_OPTIONS,
   REVIEW_STATUS_META,
+  canShowReviewNote,
+  reviewEntityEditHref,
 } from '@/features/review/constants'
 import { hasPermission, isDataEntryUser, isSuperAdmin } from '@/features/auth/lib/admin-section-access'
 import { handleApiError } from '@/lib/http/api-error'
@@ -83,6 +87,10 @@ export default function ReviewQueuePage() {
     ),
   )
   const [viewItem, setViewItem] = useState(
+    /** @type {null | import('@/features/review/api/review-api.types').ReviewItem} */ (null),
+  )
+  const [editQuestionUuid, setEditQuestionUuid] = useState(/** @type {string | null} */ (null))
+  const [reviewNoteItem, setReviewNoteItem] = useState(
     /** @type {null | import('@/features/review/api/review-api.types').ReviewItem} */ (null),
   )
 
@@ -215,6 +223,10 @@ export default function ReviewQueuePage() {
     ? viewList.findIndex((it) => it.entityType === viewItem.entityType && it.uuid === viewItem.uuid)
     : -1
   const nextItem = viewIndex >= 0 && viewIndex < viewList.length - 1 ? viewList[viewIndex + 1] : null
+
+  function openFlaggedQuestionEdit(uuid) {
+    setEditQuestionUuid(uuid)
+  }
 
   const tabs = useMemo(() => {
     const list = []
@@ -376,7 +388,14 @@ export default function ReviewQueuePage() {
                               {item.createdBy?.name ?? '—'}
                             </td>
                             <td className="px-4 py-3">
-                              <ReviewStatusBadge status={item.reviewStatus} />
+                              <ReviewStatusBadge
+                                status={item.reviewStatus}
+                                onClick={
+                                  canShowReviewNote(item)
+                                    ? () => setReviewNoteItem(item)
+                                    : undefined
+                                }
+                              />
                             </td>
                             <td className="max-w-xs px-4 py-3 text-xs text-muted-foreground">
                               <span className="line-clamp-2">{item.reviewNote || '—'}</span>
@@ -547,8 +566,7 @@ export default function ReviewQueuePage() {
           <CardHeader className="pb-4">
             <CardTitle>Flagged for you</CardTitle>
             <CardDescription>
-              Fix these in their section (e.g. Tests). They are re-checked automatically after you
-              edit them.
+              Edit flagged items here. After you save, they are sent back for re-check.
             </CardDescription>
           </CardHeader>
           <DataTable>
@@ -571,32 +589,74 @@ export default function ReviewQueuePage() {
                       <th className="px-4 py-3 font-medium">Status</th>
                       <th className="px-4 py-3 font-medium">What to fix</th>
                       <th className="px-4 py-3 font-medium">Flagged by</th>
+                      <th className="px-4 py-3 font-medium">
+                        <span className="sr-only">Actions</span>
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
                     {mineItems.length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="px-4 py-10 text-center text-muted-foreground">
+                        <td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">
                           You have no items awaiting correction.
                         </td>
                       </tr>
                     ) : (
-                      mineItems.map((item) => (
-                        <tr
-                          key={`${item.entityType}:${item.uuid}`}
-                          className="border-b border-border/60 align-top last:border-0"
-                        >
-                          <td className="px-4 py-3 text-xs">{entityLabel(item)}</td>
-                          <td className="max-w-sm px-4 py-3">{renderItemTitle(item)}</td>
-                          <td className="px-4 py-3">
-                            <ReviewStatusBadge status={item.reviewStatus} />
-                          </td>
-                          <td className="max-w-md px-4 py-3 text-xs text-muted-foreground">
-                            <span className="line-clamp-3">{item.reviewNote || '—'}</span>
-                          </td>
-                          <td className="px-4 py-3 text-xs">{item.reviewedBy?.name ?? '—'}</td>
-                        </tr>
-                      ))
+                      mineItems.map((item) => {
+                        const editHref = reviewEntityEditHref(item.entityType, item.uuid)
+                        return (
+                          <tr
+                            key={`${item.entityType}:${item.uuid}`}
+                            className="border-b border-border/60 align-top last:border-0"
+                          >
+                            <td className="px-4 py-3 text-xs">{entityLabel(item)}</td>
+                            <td className="max-w-sm px-4 py-3">{renderItemTitle(item)}</td>
+                            <td className="px-4 py-3">
+                              <ReviewStatusBadge
+                                status={item.reviewStatus}
+                                onClick={
+                                  canShowReviewNote(item)
+                                    ? () => setReviewNoteItem(item)
+                                    : undefined
+                                }
+                              />
+                            </td>
+                            <td className="max-w-md px-4 py-3 text-xs text-muted-foreground">
+                              <span className="line-clamp-3">{item.reviewNote || '—'}</span>
+                            </td>
+                            <td className="px-4 py-3 text-xs">{item.reviewedBy?.name ?? '—'}</td>
+                            <td className="px-4 py-3 text-right">
+                              {item.entityType === 'question' ? (
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-8 gap-1.5"
+                                  onClick={() => openFlaggedQuestionEdit(item.uuid)}
+                                >
+                                  <Pencil className="size-3.5" aria-hidden />
+                                  Edit
+                                </Button>
+                              ) : editHref ? (
+                                <Button
+                                  asChild
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-8 gap-1.5"
+                                >
+                                  <Link to={editHref}>
+                                    <Pencil className="size-3.5" aria-hidden />
+                                    Edit
+                                  </Link>
+                                </Button>
+                              ) : (
+                                <span className="text-xs text-muted-foreground">—</span>
+                              )}
+                            </td>
+                          </tr>
+                        )
+                      })
                     )}
                   </tbody>
                 </table>
@@ -702,6 +762,19 @@ export default function ReviewQueuePage() {
               ) : null}
             </div>
             <div className="flex gap-2">
+              {tab === 'mine' && viewItem?.entityType === 'question' ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    openFlaggedQuestionEdit(viewItem.uuid)
+                    setViewItem(null)
+                  }}
+                >
+                  <Pencil className="size-4" aria-hidden />
+                  Edit
+                </Button>
+              ) : null}
               <Button type="button" variant="ghost" onClick={() => setViewItem(null)}>
                 Close
               </Button>
@@ -717,6 +790,21 @@ export default function ReviewQueuePage() {
           </ModalFooter>
         ) : null}
       </Modal>
+
+      <QuestionEditDialog
+        open={Boolean(editQuestionUuid)}
+        questionUuid={editQuestionUuid}
+        onClose={() => setEditQuestionUuid(null)}
+        onSaved={() => {
+          void queryClient.invalidateQueries({ queryKey: mineKey })
+        }}
+      />
+
+      <ReviewNoteDialog
+        open={Boolean(reviewNoteItem)}
+        item={reviewNoteItem}
+        onClose={() => setReviewNoteItem(null)}
+      />
     </div>
   )
 }

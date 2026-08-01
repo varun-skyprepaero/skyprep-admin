@@ -13,10 +13,13 @@ import {
 import { fetchMyEntries } from '@/features/review/api/review-api'
 import { ReviewStatusBadge } from '@/features/review/components/review-status-badge'
 import { ReviewItemLabel } from '@/features/review/components/review-item-label'
+import { ReviewNoteDialog } from '@/features/review/components/ReviewNoteDialog'
 import { PaymentStatusBadge } from '@/features/review/components/payment-status-badge'
 import {
   REVIEW_ENTITY_LABELS,
+  canShowReviewNote,
   isReviewEntryDeleteDisabled,
+  isReviewEntryEditDisabled,
   reviewEntityEditHref,
 } from '@/features/review/constants'
 import {
@@ -84,6 +87,9 @@ export function MyEntriesTab() {
   const [paymentFilter, setPaymentFilter] = useState('')
   const [deleteTarget, setDeleteTarget] = useState(
     /** @type {{ entityType: string, uuid: string, label: string } | null} */ (null),
+  )
+  const [reviewNoteItem, setReviewNoteItem] = useState(
+    /** @type {import('@/features/review/api/review-api.types').ReviewItem | null} */ (null),
   )
 
   const query = useQuery({
@@ -191,11 +197,12 @@ export function MyEntriesTab() {
               </p>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[800px] text-left text-sm">
+                <table className="w-full min-w-[920px] text-left text-sm">
                   <thead className="border-b bg-muted/40 text-xs uppercase text-muted-foreground">
                     <tr>
                       <th className="px-4 py-3 font-medium">Type</th>
                       <th className="px-4 py-3 font-medium">Item</th>
+                      <th className="px-4 py-3 font-medium">Book</th>
                       <th className="px-4 py-3 font-medium">Review</th>
                       <th className="px-4 py-3 font-medium">Payment</th>
                       <th className="px-4 py-3 font-medium">Created</th>
@@ -207,13 +214,14 @@ export function MyEntriesTab() {
                   <tbody>
                     {paginatedRows.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">
+                        <td colSpan={7} className="px-4 py-10 text-center text-muted-foreground">
                           No entries yet.
                         </td>
                       </tr>
                     ) : (
                       paginatedRows.map((item) => {
                         const editHref = reviewEntityEditHref(item.entityType, item.uuid)
+                        const canEdit = Boolean(editHref) && !isReviewEntryEditDisabled(item)
                         const canDelete =
                           Boolean(DELETE_BY_ENTITY[item.entityType]) &&
                           !isReviewEntryDeleteDisabled(item)
@@ -231,8 +239,18 @@ export function MyEntriesTab() {
                             <td className="max-w-sm px-4 py-3">
                               <ReviewItemLabel item={item} />
                             </td>
+                            <td className="max-w-xs px-4 py-3 text-xs text-muted-foreground">
+                              {item.entityType === 'lesson' ? item.bookTitle || '—' : '—'}
+                            </td>
                             <td className="px-4 py-3">
-                              <ReviewStatusBadge status={item.reviewStatus} />
+                              <ReviewStatusBadge
+                                status={item.reviewStatus}
+                                onClick={
+                                  canShowReviewNote(item)
+                                    ? () => setReviewNoteItem(item)
+                                    : undefined
+                                }
+                              />
                             </td>
                             <td className="px-4 py-3">
                               <PaymentStatusBadge status={item.paymentStatus} />
@@ -242,7 +260,7 @@ export function MyEntriesTab() {
                             </td>
                             <td className="px-4 py-3 text-right">
                               <div className="inline-flex items-center justify-end gap-2">
-                                {editHref ? (
+                                {canEdit ? (
                                   <Button
                                     asChild
                                     type="button"
@@ -275,7 +293,7 @@ export function MyEntriesTab() {
                                     <Trash2 className="size-3.5" aria-hidden />
                                     Delete
                                   </Button>
-                                ) : !editHref ? (
+                                ) : !canEdit && !DELETE_BY_ENTITY[item.entityType] ? (
                                   <span className="text-xs text-muted-foreground">—</span>
                                 ) : null}
                               </div>
@@ -302,7 +320,9 @@ export function MyEntriesTab() {
         deletePending={deleteMu.isPending}
         onClose={() => setDeleteTarget(null)}
         onEdit={
-          deleteTarget && reviewEntityEditHref(deleteTarget.entityType, deleteTarget.uuid)
+          deleteTarget &&
+          reviewEntityEditHref(deleteTarget.entityType, deleteTarget.uuid) &&
+          !isReviewEntryEditDisabled(deleteTarget)
             ? () => {
                 const href = reviewEntityEditHref(deleteTarget.entityType, deleteTarget.uuid)
                 setDeleteTarget(null)
@@ -317,6 +337,12 @@ export function MyEntriesTab() {
             uuid: deleteTarget.uuid,
           })
         }
+      />
+
+      <ReviewNoteDialog
+        open={Boolean(reviewNoteItem)}
+        item={reviewNoteItem}
+        onClose={() => setReviewNoteItem(null)}
       />
 
       <Card>
