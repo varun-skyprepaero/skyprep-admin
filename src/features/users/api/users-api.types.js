@@ -27,6 +27,7 @@
  *   language?: string | null
  *   currency?: string | null
  *   gender?: string | null
+ *   auditors?: Array<{ uuid: string, name: string, email: string }>
  *   auditor?: { uuid: string, name: string, email: string } | null
  * }} AdminUserRow
  */

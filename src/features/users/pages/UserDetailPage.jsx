@@ -23,7 +23,6 @@ import {
 } from '@/components/ui/card'
 import { DeleteConfirmDialog } from '@/components/ui/delete-confirm-dialog'
 import { Modal, ModalBody, ModalFooter, ModalHeader } from '@/components/ui/modal'
-import { Label } from '@/components/ui/label'
 import { GrantAccessDialog } from '@/features/subscription/components/GrantAccessDialog'
 import { CLASSROOM_APP_ROLE_NAMES, DATA_ENTRY_ROLE_NAME, SUPER_ADMIN_ROLE_NAME } from '@/features/invitations/constants'
 import {
@@ -33,6 +32,7 @@ import {
   hasPermission,
 } from '@/features/auth/lib/admin-section-access'
 import { ClassroomImpersonateDialog } from '@/features/users/components/ClassroomImpersonateDialog'
+import { AuditorMultiSelect } from '@/features/users/components/AuditorMultiSelect'
 import { SignupSourceBadge } from '@/features/users/components/SignupSourceBadge'
 import { UserEditDialog } from '@/features/users/components/UserEditDialog'
 import { UserProgramsAccessCard } from '@/features/users/components/UserProgramsAccessCard'
@@ -140,7 +140,7 @@ export default function UserDetailPage({ userUuid }) {
   const [impersonateTarget, setImpersonateTarget] = useState(
     /** @type {null | { uuid: string, email: string, name: string }} */ (null),
   )
-  const [auditorUuid, setAuditorUuid] = useState(/** @type {string | null} */ (null))
+  const [auditorUuids, setAuditorUuids] = useState(/** @type {string[]} */ ([]))
   const [auditorModalOpen, setAuditorModalOpen] = useState(false)
 
   const canEdit = hasPermission(matrix, 'users.directory', 'edit', actor)
@@ -197,9 +197,9 @@ export default function UserDetailPage({ userUuid }) {
   })
 
   const auditorMutation = useMutation({
-    mutationFn: (nextAuditorUuid) => setUserAuditor(userUuid, nextAuditorUuid),
+    mutationFn: (nextAuditorUuids) => setUserAuditor(userUuid, nextAuditorUuids),
     onSuccess: (response) => {
-      notifySuccess(response?.message ?? 'Auditor updated')
+      notifySuccess(response?.message ?? 'Auditors updated')
       setAuditorModalOpen(false)
       queryClient.invalidateQueries({ queryKey: usersQueryKey })
     },
@@ -372,11 +372,12 @@ export default function UserDetailPage({ userUuid }) {
               variant="outline"
               size="sm"
               onClick={() => {
-                setAuditorUuid(user.auditor?.uuid ?? null)
+                const assigned = user.auditors ?? (user.auditor ? [user.auditor] : [])
+                setAuditorUuids(assigned.map((a) => a.uuid))
                 setAuditorModalOpen(true)
               }}
             >
-              {user.auditor ? 'Change auditor' : 'Assign auditor'}
+              {(user.auditors?.length ?? (user.auditor ? 1 : 0)) ? 'Change auditors' : 'Assign auditors'}
             </Button>
           ) : null}
           {canDelete ? (
@@ -430,15 +431,19 @@ export default function UserDetailPage({ userUuid }) {
             <DetailRow label="Phone verified" value={verificationLabel(user.isPhoneVerified)} />
             {roleName === DATA_ENTRY_ROLE_NAME ? (
               <DetailRow
-                label="Auditor"
+                label="Auditors"
                 value={
-                  user.auditor?.name ? (
-                    <span>
-                      {user.auditor.name}
-                      {user.auditor.email ? (
-                        <span className="block text-xs text-muted-foreground">{user.auditor.email}</span>
-                      ) : null}
-                    </span>
+                  (user.auditors?.length ?? (user.auditor ? 1 : 0)) ? (
+                    <ul className="space-y-1">
+                      {(user.auditors ?? (user.auditor ? [user.auditor] : [])).map((auditor) => (
+                        <li key={auditor.uuid}>
+                          {auditor.name}
+                          {auditor.email ? (
+                            <span className="block text-xs text-muted-foreground">{auditor.email}</span>
+                          ) : null}
+                        </li>
+                      ))}
+                    </ul>
                   ) : (
                     'Unassigned'
                   )
@@ -568,8 +573,8 @@ export default function UserDetailPage({ userUuid }) {
         aria-labelledby="detail-auditor-title"
       >
         <ModalHeader
-          title="Assign auditor"
-          description={`Choose the admin who audits ${displayName}'s data-entry work.`}
+          title="Assign auditors"
+          description={`Choose the admin(s) who audit ${displayName}'s data-entry work.`}
           titleId="detail-auditor-title"
           onClose={() => setAuditorModalOpen(false)}
           closeDisabled={auditorMutation.isPending}
@@ -578,27 +583,16 @@ export default function UserDetailPage({ userUuid }) {
           className="flex min-h-0 flex-1 flex-col"
           onSubmit={(event) => {
             event.preventDefault()
-            auditorMutation.mutate(auditorUuid || null)
+            auditorMutation.mutate(auditorUuids)
           }}
         >
           <ModalBody className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="detail-auditor">Auditor</Label>
-              <select
-                id="detail-auditor"
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm"
-                value={auditorUuid ?? ''}
-                onChange={(event) => setAuditorUuid(event.target.value || null)}
-                disabled={auditorMutation.isPending || auditorsQuery.isLoading}
-              >
-                <option value="">Unassigned</option>
-                {auditorOptions.map((opt) => (
-                  <option key={opt.uuid} value={opt.uuid}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <AuditorMultiSelect
+              options={auditorOptions}
+              selected={auditorUuids}
+              disabled={auditorMutation.isPending || auditorsQuery.isLoading}
+              onChange={setAuditorUuids}
+            />
           </ModalBody>
           <ModalFooter>
             <Button

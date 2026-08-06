@@ -483,7 +483,9 @@ export default function SubscriptionPlansPage() {
                   {paginatedRows.length === 0 ? (
                     <tr>
                       <td colSpan={9} className="px-4 py-8 text-center text-muted-foreground">
-                        No subscription plans match your filters.
+                        {rows.length === 0
+                          ? 'No subscription plans yet. Create your first plan to get started.'
+                          : 'No subscription plans match your filters.'}
                       </td>
                     </tr>
                   ) : (

@@ -268,11 +268,15 @@ export function GrantAccessDialog({
               <option value="">
                 {!studentEmailValid
                   ? 'Select a student first…'
-                  : grantPreviewLoading
-                    ? 'Checking access…'
-                    : grantablePlans.length === 0
-                      ? 'No plans available for this student'
-                      : 'Select plan…'}
+                  : plansLoading
+                    ? 'Loading plans…'
+                    : plans.length === 0
+                      ? 'No subscription plans configured'
+                      : grantPreviewLoading
+                        ? 'Checking access…'
+                        : grantablePlans.length === 0
+                          ? 'No plans available for this student'
+                          : 'Select plan…'}
               </option>
               {grantablePlans.map((plan) => (
                 <option key={plan.uuid} value={plan.planKey}>
@@ -286,10 +290,16 @@ export function GrantAccessDialog({
             {studentEmailValid &&
             grantPreview &&
             !grantPreviewLoading &&
+            plans.length > 0 &&
             grantablePlans.length === 0 ? (
               <p className="text-xs text-amber-700 dark:text-amber-400">
                 This student already has access from their current plan. Choose a different student
                 or change their subscription on the Subscribers page first.
+              </p>
+            ) : !plansLoading && plans.length === 0 ? (
+              <p className="text-xs text-muted-foreground">
+                No subscription plans exist yet. Create one under Subscription → Plans before
+                granting access.
               </p>
             ) : selectedPlan ? (
               <p className="text-xs text-muted-foreground">

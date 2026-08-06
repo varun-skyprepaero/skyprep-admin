@@ -37,6 +37,7 @@ import { CLASSROOM_APP_ROLE_NAMES } from '@/features/invitations/constants'
 import { GrantAccessDialog } from '@/features/subscription/components/GrantAccessDialog'
 import { fetchInvitableRoles } from '@/features/roles-permissions/api/permissions-api'
 import { ClassroomImpersonateDialog } from '@/features/users/components/ClassroomImpersonateDialog'
+import { AuditorMultiSelect } from '@/features/users/components/AuditorMultiSelect'
 import { SignupSourceBadge } from '@/features/users/components/SignupSourceBadge'
 import { adminDeleteUser, fetchAuditors, fetchDeletedUsers, fetchUsers, permanentlyDeleteUser, setUserAuditor } from '@/features/users/api/users-api'
 import {
@@ -100,7 +101,8 @@ function buildTableRows(users, invitations) {
     storageQuotaBytes: u.storageQuotaBytes ?? null,
     createdAt: u.createdAt,
     auditor: u.auditor ?? null,
-    auditorUuid: u.auditor?.uuid ?? null,
+    auditors: u.auditors ?? (u.auditor ? [u.auditor] : []),
+    auditorUuids: (u.auditors ?? (u.auditor ? [u.auditor] : [])).map((a) => a.uuid),
     sortAt: u.createdAt || 0,
   }))
 
@@ -261,7 +263,7 @@ export default function UsersPage() {
     /** @type {null | { email: string, name: string }} */ (null),
   )
   const [auditorTarget, setAuditorTarget] = useState(
-    /** @type {null | { uuid: string, name: string, auditorUuid: string | null }} */ (null),
+    /** @type {null | { uuid: string, name: string, auditorUuids: string[] }} */ (null),
   )
 
   const [tableSearch, setTableSearch] = useState('')
@@ -507,10 +509,10 @@ export default function UsersPage() {
   })
 
   const auditorMutation = useMutation({
-    mutationFn: (/** @type {{ uuid: string, auditorUuid: string | null }} */ vars) =>
-      setUserAuditor(vars.uuid, vars.auditorUuid),
+    mutationFn: (/** @type {{ uuid: string, auditorUuids: string[] }} */ vars) =>
+      setUserAuditor(vars.uuid, vars.auditorUuids),
     onSuccess: (response) => {
-      notifySuccess(response?.message ?? 'Auditor updated')
+      notifySuccess(response?.message ?? 'Auditors updated')
       setAuditorTarget(null)
       invalidatePeople()
     },
@@ -523,7 +525,7 @@ export default function UsersPage() {
   function openAssignAuditor(row) {
     if (row.kind !== 'user' || row.roleName !== DATA_ENTRY_ROLE_NAME) return
     const name = [row.firstName, row.lastName].filter(Boolean).join(' ') || row.email || 'User'
-    setAuditorTarget({ uuid: row.uuid, name, auditorUuid: row.auditorUuid ?? null })
+    setAuditorTarget({ uuid: row.uuid, name, auditorUuids: row.auditorUuids ?? [] })
   }
 
   function handleInviteSubmit(e) {
@@ -925,8 +927,10 @@ export default function UsersPage() {
                           <td className="px-4 py-3 align-middle lg:px-6">{row.roleName ?? '—'}</td>
                           <td className="px-4 py-3 align-middle lg:px-6">
                             {row.kind === 'user' && row.roleName === DATA_ENTRY_ROLE_NAME ? (
-                              row.auditor?.name ? (
-                                <span className="text-sm">{row.auditor.name}</span>
+                              row.auditors?.length ? (
+                                <span className="text-sm">
+                                  {row.auditors.map((a) => a.name).join(', ')}
+                                </span>
                               ) : (
                                 <span className="text-xs text-muted-foreground">Unassigned</span>
                               )
@@ -1038,9 +1042,9 @@ export default function UsersPage() {
                                     ...(canEditAuditors && row.roleName === DATA_ENTRY_ROLE_NAME
                                       ? [
                                           {
-                                            label: row.auditorUuid
-                                              ? 'Change auditor'
-                                              : 'Assign auditor',
+                                            label: row.auditorUuids?.length
+                                              ? 'Change auditors'
+                                              : 'Assign auditors',
                                             onClick: () => openAssignAuditor(row),
                                           },
                                         ]
@@ -1197,10 +1201,10 @@ export default function UsersPage() {
         aria-labelledby="assign-auditor-title"
       >
         <ModalHeader
-          title="Assign auditor"
+          title="Assign auditors"
           description={
             <>
-              Choose the admin who audits{' '}
+              Choose the admin(s) who audit{' '}
               <span className="font-medium text-foreground">{auditorTarget?.name}</span>&apos;s
               data-entry work.
             </>
@@ -1216,35 +1220,22 @@ export default function UsersPage() {
             if (!auditorTarget) return
             auditorMutation.mutate({
               uuid: auditorTarget.uuid,
-              auditorUuid: auditorTarget.auditorUuid || null,
+              auditorUuids: auditorTarget.auditorUuids,
             })
           }}
         >
           <ModalBody className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="assign-auditor-select">Auditor</Label>
-              <select
-                id="assign-auditor-select"
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm"
-                value={auditorTarget?.auditorUuid ?? ''}
-                onChange={(e) =>
-                  setAuditorTarget((s) =>
-                    s ? { ...s, auditorUuid: e.target.value || null } : s,
-                  )
-                }
-                disabled={auditorMutation.isPending || auditorsQuery.isLoading}
-              >
-                <option value="">Unassigned</option>
-                {auditorOptions.map((opt) => (
-                  <option key={opt.uuid} value={opt.uuid}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-              {auditorsQuery.isLoading ? (
-                <p className="text-xs text-muted-foreground">Loading auditors…</p>
-              ) : null}
-            </div>
+            <AuditorMultiSelect
+              options={auditorOptions}
+              selected={auditorTarget?.auditorUuids ?? []}
+              disabled={auditorMutation.isPending || auditorsQuery.isLoading}
+              onChange={(auditorUuids) =>
+                setAuditorTarget((s) => (s ? { ...s, auditorUuids } : s))
+              }
+            />
+            {auditorsQuery.isLoading ? (
+              <p className="text-xs text-muted-foreground">Loading auditors…</p>
+            ) : null}
           </ModalBody>
           <ModalFooter>
             <Button

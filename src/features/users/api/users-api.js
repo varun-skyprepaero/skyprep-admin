@@ -80,14 +80,19 @@ export async function fetchAuditors() {
 }
 
 /**
- * Assign (or clear, when auditorUuid is null) the admin who audits a data-entry user.
+ * Assign auditors for a data-entry user (empty array clears all).
  * @param {string} userUuid
- * @param {string | null} auditorUuid
+ * @param {string[]} auditorUuids
  */
-export async function setUserAuditor(userUuid, auditorUuid) {
+export async function setUserAuditor(userUuid, auditorUuids) {
   try {
+    const uuids = Array.isArray(auditorUuids)
+      ? auditorUuids
+      : auditorUuids
+        ? [auditorUuids]
+        : []
     const { data } = await apiClient.patch(USER_ENDPOINTS.setAuditor(userUuid), {
-      auditorUuid: auditorUuid || null,
+      auditorUuids: uuids,
     })
     return data
   } catch (error) {
