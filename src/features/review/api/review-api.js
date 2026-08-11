@@ -105,7 +105,6 @@ export async function fetchAuthorEntries(params = {}) {
     const payload = data?.data ?? {}
     return {
       items: Array.isArray(payload.items) ? payload.items : [],
-      totals: payload.totals ?? { total: 0, accepted: 0, payable: 0, paid: 0, unpaid: 0 },
     }
   } catch (error) {
     throw toApiClientError(error)
@@ -143,18 +142,24 @@ export async function fetchPayoutBatches(params = {}) {
 
 /**
  * Settle an auditee's accepted work into a payout batch.
- * @param {{ authorUuid: string, items?: Array<{ domain?: string, entityType: string, uuid: string }>, all?: boolean, note?: string, ratePerItem?: number | string | null }} input
+ * @param {{ authorUuid: string, items?: Array<{ domain?: string, entityType: string, uuid: string }>, all?: boolean, count?: number, note?: string, ratePerItem?: number | string | null }} input
  * @returns {Promise<{ count: number, batch: import('./review-api.types').PayoutBatch | null }>}
  */
-export async function markEntriesPaid({ authorUuid, items, all = false, note, ratePerItem }) {
+export async function markEntriesPaid({ authorUuid, items, all = false, count, note, ratePerItem }) {
   try {
-    const { data } = await apiClient.post(REVIEW_ENDPOINTS.markPaid, {
+    const body = {
       authorUuid,
-      items,
-      all,
       note: note ?? null,
       ratePerItem: ratePerItem ?? null,
-    })
+    }
+    if (all) {
+      body.all = true
+    } else if (count != null && Number.isFinite(Number(count)) && Number(count) > 0) {
+      body.count = Math.floor(Number(count))
+    } else if (Array.isArray(items) && items.length) {
+      body.items = items
+    }
+    const { data } = await apiClient.post(REVIEW_ENDPOINTS.markPaid, body)
     return data?.data ?? { count: 0, batch: null }
   } catch (error) {
     throw toApiClientError(error)

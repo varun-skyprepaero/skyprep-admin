@@ -60,6 +60,14 @@ function formatMoney(value) {
   return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
+function isContiguousFromStart(items, selectedKeys) {
+  if (!selectedKeys.length) return false
+  for (let i = 0; i < selectedKeys.length; i += 1) {
+    if (itemKey(items[i]) !== selectedKeys[i]) return false
+  }
+  return true
+}
+
 function selectFirstItems(items, count) {
   const n = Math.max(0, Math.min(items.length, Math.floor(Number(count) || 0)))
   const next = {}
@@ -88,24 +96,34 @@ function PayoutDialog({ author, onClose, onPaid }) {
   })
 
   const items = entriesQuery.data?.items ?? []
-  const selectedKeys = Object.keys(selected)
+  const selectedKeys = useMemo(
+    () => items.filter((it) => selected[itemKey(it)]).map((it) => itemKey(it)),
+    [items, selected],
+  )
   const allSelected = items.length > 0 && selectedKeys.length === items.length
   const parsedRate = parseRate(rate)
   const payoutCount = selectedKeys.length
   const finalAmount = parsedRate != null && payoutCount > 0 ? parsedRate * payoutCount : null
 
   const mutation = useMutation({
-    mutationFn: () =>
-      markEntriesPaid({
+    mutationFn: () => {
+      const payload = {
         authorUuid: author.authorUuid,
-        items: Object.values(selected).map((it) => ({
-          domain: it.domain,
-          entityType: it.entityType,
-          uuid: it.uuid,
-        })),
         note: note.trim() || undefined,
         ratePerItem: parsedRate,
-      }),
+      }
+      if (allSelected) {
+        payload.all = true
+      } else if (isContiguousFromStart(items, selectedKeys)) {
+        payload.count = selectedKeys.length
+      } else {
+        payload.items = Object.values(selected).map((it) => ({
+          entityType: it.entityType,
+          uuid: it.uuid,
+        }))
+      }
+      return markEntriesPaid(payload)
+    },
     onSuccess: (data) => {
       notifySuccess(
         data?.count ? `Marked ${data.count} item${data.count === 1 ? '' : 's'} paid` : 'Nothing to pay',
